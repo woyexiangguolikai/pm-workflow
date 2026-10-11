@@ -129,7 +129,7 @@
 | `check-library.py` | 03b · A1–A8 | OK | **8/8** |
 | `check-prototype.py` | 04 · A1–A5 + **A7** 页面集合 vs 线框集合 | OK | 4/5 → 5/5 → **6/6** |
 | `check-offline.py` | 04 · **A6** 离线包 `file://` 实测 | OK | **通过**（3 个单文件 / 0 报错 / 23 个锚点全生效 / 3 页可达） |
-| `check-cards.py` | 06 · A1–A6 | OK | 5/6 → **6/6** |
+| `check-cards.py` | 06 · A1–A6 + **A7** 变更影响面「具体表现」 | OK | 5/6 → 6/6 → **7/7** |
 | `scripts/check-publish-safe.py` | 发布守卫 · BLOCK / WARN 三级 | OK | **0 BLOCK**（非阶段判据） |
 
 > **阶段与检查器的对应**：一个阶段可能有**多个**检查器（02 是 `check-prd-md` + `check-duplicate-norms`；
