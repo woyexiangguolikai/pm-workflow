@@ -303,7 +303,8 @@ def ident_to_iso(line: str) -> tuple[str, str, str]:
     return name, mail, "%s%s%s:%s" % (stamp, sign, hh, mm)
 
 
-def publish(cli: Client, dry_run: bool, make_tag: bool) -> int:
+def publish(cli: Client, dry_run: bool, make_tag: bool,
+            make_release_flag: bool = True) -> int:
     local_head = gittext("rev-parse", "HEAD")
     local_tree = gittext("rev-parse", "HEAD^{tree}")
     local_parent = gittext("rev-parse", "HEAD^")
@@ -405,8 +406,44 @@ def publish(cli: Client, dry_run: bool, make_tag: bool) -> int:
             res = cli.call("POST", "/repos/%s/git/refs" % cli.slug,
                            {"ref": "refs/tags/" + tag, "sha": commit["sha"]})
             print("\n标签 %s %s" % (tag, "已存在，跳过" if res.get("_already_exists") else "已创建"))
-            print("  记得同步建 Release（CHANGELOG 段头 / SKILL.md / tag 三处版本号必须一致）。")
+            if make_release_flag:
+                make_release(cli, tag)
+            else:
+                print("  跳过 Release（--no-release）。"
+                      "注意：CHANGELOG 段头 / SKILL.md / tag 三处版本号必须一致。")
     return 0
+
+
+def make_release(cli: "Client", tag: str, changelog: Path | None = None) -> None:
+    """按 CHANGELOG 里该版本的段落建 Release。
+
+    🔴 为什么进脚本而不是手搓：建 Release 这件事本轮已经手写了一遍，
+    而手写的代价是**每次都要重新猜一遍 API 调用形态**（本轮就猜错了两次：
+    token 取到的是元组、相对链接在 Release 里点不开）。
+    手搓一次就错一次的东西，必须固化。
+
+    正文取 `CHANGELOG.md` 里 `## [tag]` 到下一个 `## [` 之间的内容 ——
+    **从文件现取**，不另维护一份（两份正文必然漂移）。
+    仓库内相对链接改写成绝对 URL：GitHub Release 里相对链接指向的是用户自己的仓库。
+    """
+    changelog = changelog or (REPO_DIR / "CHANGELOG.md")
+    if not changelog.exists():
+        print("  ⚠ 找不到 %s，跳过 Release。" % changelog.name)
+        return
+    text = changelog.read_text(encoding="utf-8")
+    m = re.search(r"## \[%s\][^\n]*\n(.*?)(?=\n## \[|\Z)" % re.escape(tag), text, re.S)
+    if not m:
+        print("  ⚠ CHANGELOG 里没有 [%s] 段，跳过 Release。" % tag)
+        return
+    body = m.group(0).strip()
+    # 把仓库内相对链接换成绝对 URL
+    body = re.sub(r"\]\((?!https?://)([^)]+)\)",
+                  lambda mm: "](https://github.com/%s/blob/main/%s)" % (cli.slug, mm.group(1)),
+                  body)
+    res = cli.call("POST", "/repos/%s/releases" % cli.slug,
+                   {"tag_name": tag, "name": tag, "body": body,
+                    "draft": False, "prerelease": False})
+    print("  Release 已建: %s" % (res.get("html_url") or "(无 URL)"))
 
 
 def main() -> int:
@@ -415,6 +452,7 @@ def main() -> int:
     ap.add_argument("--verify", action="store_true",
                     help="只做验收：逐路径比对远端 main 与本地 HEAD，不发布")
     ap.add_argument("--no-tag", action="store_true", help="不打标签")
+    ap.add_argument("--no-release", action="store_true", help="打标签但不建 Release")
     ap.add_argument("--helper", default=None, help="git credential helper 的可执行文件路径")
     ap.add_argument("--repo-url", default=None, help="覆盖 origin（默认读 git remote get-url origin）")
     ap.add_argument("--token", default=None, help="直接给 token（不推荐，优先环境变量）")
@@ -437,7 +475,7 @@ def main() -> int:
     cli = Client(token, slug)
     if args.verify:
         return 0 if compare(cli) else 1
-    return publish(cli, args.dry_run, not args.no_tag)
+    return publish(cli, args.dry_run, not args.no_tag, not args.no_release)
 
 
 if __name__ == "__main__":
