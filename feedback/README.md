@@ -125,7 +125,7 @@
 | `check-requirements.py` | 01 · A1–A6 | OK | 3/6 → **6/6** |
 | `check-prd-md.py` | 02 · A1–A6 | OK | 4/6（A5/A6 属**已知待补标**，见 02 B4，非新增缺陷） |
 | `check-duplicate-norms.py` | 02 · **A7** 口径副本检测 | OK | **1/1**（定义正文指纹命中 1 处、副本 0） |
-| `check-design-tokens.py` | 03 · A1–A5 | OK | 2/5 → **5/5** |
+| `check-design-tokens.py` | 03 · A1–A5 + **A6** 公共组件声明与实现对齐 | OK | 2/5 → 5/5 → **5/6**（A6 报出 11 处真缺口，未修） |
 | `check-library.py` | 03b · A1–A8 | OK | **8/8** |
 | `check-prototype.py` | 04 · A1–A5 + **A7** 页面集合 vs 线框集合 | OK | 4/5 → 5/5 → **6/6** |
 | `check-offline.py` | 04 · **A6** 离线包 `file://` 实测 | OK | **通过**（3 个单文件 / 0 报错 / 23 个锚点全生效 / 3 页可达） |
