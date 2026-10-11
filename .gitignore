@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────
+#  排除「本地产出 / 私有内容」—— 发布前必须保持这份清单生效
+#  自检：python scripts/check-publish-safe.py .
+#  它会检查这些路径是否真的被忽略了
+# ─────────────────────────────────────────────────────────
+
+# 1) 单次评审记录：含具体项目内容，且反馈层的纪律是「存判据不存产出」
+#    提炼后的结论已经写进 rubric/ 与 anti-patterns.md，原始报告不必随仓库走
+feedback/review/
+# 评审流水：本机的评审历史，别人拿到没有意义
+feedback/review-log.jsonl
+
+# 2) 素材库私有区：没把握许可 / 内部素材 / 未整理的草稿
+#    放进 local/ 的东西永不发布，也不会被检查器拦（它在白名单里被豁免）
+library/local/
+
+# 2b) 项目词黑名单本体：它列的就是敏感词，放出去等于把要防的东西自己发一遍
+#     仓库里只提供 publish-denylist.example.txt 作为模板
+scripts/publish-denylist.txt
+
+# 3) 手册生成物：由 scripts/build-manual.py 从 references/ 现渲染，不进版本库
+_manual/
+manual-out/
+
+# 4) 跑工作流时产生的项目目录（数据源 + 视图都是逐项目的产出）
+projects/
+
+# 5) Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 6) 截图 / 出图（按需保留：想给 README 配图就删掉下面两行）
+# shots/
+# preview/
+
+# 7) 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 8) 日志与临时文件
+*.log
+*.tmp
+*.bak
+~$*

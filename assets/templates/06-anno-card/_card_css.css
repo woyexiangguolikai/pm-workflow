@@ -1,0 +1,220 @@
+/* ================= 需求卡片画布：附加样式 =================
+   引擎（_canvas_html.py）是**深色**画布（--card / --card2 / #111820）。
+   这里所有颜色必须配深色背景，不能照抄浅色文档视图那套 token ——
+   浅色文字压在深色卡上会直接糊成一片。
+   小地图选择器是 .mini i.KIND，kind 名必须与引擎里写的一致。 */
+
+/* ---- 端泳道标签 ---- */
+.blab{font-weight:700;color:#8b95a8}
+
+/* ---- 侧栏（右侧固定 420px，画布让位） ---- */
+/* ⚠️ 引擎的 #board 是 inset:0，HUD 是 right:14px。侧栏一插进来，
+   右上的工具条和右下的缩放控件就压在侧栏上了 —— 这两类都要一起让位，
+   只让 #board 是不够的。 */
+#board{right:420px!important}
+.hud.tr,.hud.br{right:434px!important}
+body.noside #board{right:0!important}
+body.noside .hud.tr,body.noside .hud.br{right:14px!important}
+body.noside .side{display:none}
+
+.side{position:fixed;right:0;top:0;bottom:0;width:420px;z-index:60;
+  display:flex;flex-direction:column;background:#0f141a;
+  border-left:1px solid #26313d;box-shadow:-8px 0 24px rgba(0,0,0,.4);
+  /* ⚠️ 水平内边距变量定义在 .side 上，整条侧栏（卡片 + 元素总表）共用。
+     原先只在 .card 上定义 → 元素总表不在 .card 里，var(--cpad-x) 解析失败，
+     padding 整条声明作废（td 拿到 0，文字贴边）。变量要放在**共同祖先**上。 */
+  --cpad-x:12px}
+.side-h{flex:0 0 auto;padding:13px 15px 11px;border-bottom:1px solid #1d242d;
+  background:#0d1319}
+.sh-t{font-size:14px;font-weight:700;color:#e6edf3;margin-bottom:3px}
+.sh-s{font-size:11px;color:#7d8794;margin-bottom:9px;line-height:1.6}
+.sh-s b{color:#58a6ff}
+.sh-a{display:flex;gap:6px;margin-top:8px}
+.mini-btn{flex:1;font-size:11px;color:#a9b4c0;background:#182028;
+  border:1px solid #2b3641;border-radius:6px;padding:5px 8px;cursor:pointer}
+.mini-btn:hover{background:#1f2a34;color:#e6edf3}
+#q{width:100%;font-size:12px;color:#e6edf3;background:#0b0f14;
+  border:1px solid #2b3641;border-radius:7px;padding:6px 9px;outline:none}
+#q::placeholder{color:#5f6a76}
+#q:focus{border-color:#3a6ea5}
+.side-h .seg{display:flex;gap:0;margin-top:8px;border:1px solid #2b3641;
+  border-radius:7px;overflow:hidden}
+.side-h .seg button{flex:1;font-size:11px;color:#8b95a8;background:#0b0f14;
+  border:0;padding:5px 0;cursor:pointer;border-right:1px solid #2b3641}
+.side-h .seg button:last-child{border-right:0}
+.side-h .seg button.on{background:#1f6feb;color:#fff}
+
+.side-b{flex:1;min-height:0;overflow:auto;padding:9px 11px 60px;
+  scroll-behavior:smooth}
+.lane{font-size:11px;font-weight:700;color:#58a6ff;letter-spacing:.5px;
+  padding:13px 4px 7px;border-bottom:1px solid #1d242d;margin-bottom:9px}
+.pg{margin-bottom:13px}
+.pgh{display:flex;align-items:baseline;gap:7px;padding:3px 4px 7px}
+.pgid{font:600 10.5px/1 ui-monospace,Consolas,monospace;color:#8b95a8;
+  background:#182028;border-radius:4px;padding:3px 5px}
+.pgn{margin:0;font-size:12.5px;font-weight:600;color:#dbe3ec;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgn-n{font-size:10.5px;color:#5f6a76}
+.pg.hide,.card.hide{display:none!important}
+
+/* ---- 卡片 ---- */
+/* 水平内边距统一由 --cpad-x 控制（定义在 .side 上）：折叠态的表头与展开态的
+   正文**必须同一个值**，否则展开瞬间文字会横向跳一下（用户明确要求「padding 规范统一」）。 */
+.card{
+  background:#131a21;border:1px solid #26313d;border-radius:9px;
+  margin-bottom:7px;overflow:hidden;transition:border-color .15s}
+.card:hover{border-color:#33414f}
+.card.hi{border-color:#58a6ff;box-shadow:0 0 0 3px rgba(88,166,255,.28)}
+.ch{display:flex;align-items:center;gap:8px;padding:9px var(--cpad-x);cursor:pointer;
+  user-select:none}
+.ch:hover{background:#161e26}
+.cid{font:600 10.5px/1 ui-monospace,Consolas,monospace;color:#58a6ff;
+  background:#12212f;border:1px solid #24445e;border-radius:4px;padding:3px 6px;
+  flex:0 0 auto}
+.ct{flex:1;min-width:0;margin:0;font-size:12.5px;font-weight:600;color:#e6edf3;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpri{font-size:10px;border-radius:20px;padding:1px 7px;flex:0 0 auto}
+.cpri.p0{background:#221214;color:#f0837d;border:1px solid #5a2a2c}
+.cpri.p1{background:#26210f;color:#e0c069;border:1px solid #4a3c18}
+.caret{width:0;height:0;flex:0 0 auto;border-left:5px solid #5f6a76;
+  border-top:4.5px solid transparent;border-bottom:4.5px solid transparent;
+  transition:transform .18s ease}
+.card.open .caret{transform:rotate(90deg)}
+.cb{padding:2px var(--cpad-x) 13px;border-top:1px solid #1d242d}
+.cdesc{margin:9px 0 8px;font-size:12px;line-height:1.72;color:#a9b4c0}
+.cmeta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}
+.chip{font-size:10px;color:#8b95a8;background:#182028;border-radius:20px;
+  padding:2px 7px}
+.chip b{color:#c3ccd6}
+.sec{margin-bottom:11px}
+.sec:last-child{margin-bottom:2px}
+.st{display:flex;align-items:baseline;gap:6px;font-size:11.5px;font-weight:700;
+  color:#dbe3ec;margin-bottom:5px}
+.st::before{content:"";width:3px;height:10px;border-radius:2px;background:#58a6ff;
+  flex:0 0 auto;align-self:center}
+.src{font-size:10px;font-weight:400;color:#5f6a76;margin-left:auto;
+  font-family:ui-monospace,Consolas,monospace;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;max-width:52%}
+.sb{font-size:12px;line-height:1.7;color:#c3ccd6}
+.none{font-size:11.5px;color:#5f6a76}
+.note-line{margin-top:7px;padding:6px 8px;font-size:11px;line-height:1.65;
+  color:#8b95a8;background:#10171e;border:1px solid #1d242d;border-radius:6px}
+.note-line b{color:#f0837d}
+.sub{font-size:10.5px;font-weight:700;color:#7d8794;margin:7px 0 4px}
+.sub:first-child{margin-top:0}
+.pp{padding:1.5px 0 1.5px 13px;position:relative}
+.pp::before{content:"·";position:absolute;left:3px;color:#5f6a76}
+.kv{display:flex;gap:8px;padding:2px 0}
+.kv .k{flex:0 0 88px;color:#7d8794;font-size:11.5px}
+.kv .v{flex:1;min-width:0}
+.btn-row{display:flex;align-items:baseline;gap:7px;padding:3px 0;
+  border-bottom:1px dashed #1d242d}
+.btn-row:last-child{border-bottom:0}
+.btn-row b{flex:0 0 auto;color:#dbe3ec;font-weight:600}
+.tag{font-size:10.5px;color:#7d8794;background:#182028;border-radius:4px;
+  padding:1px 5px;flex:0 0 auto}
+.go{flex:1;min-width:0;text-align:right;font-size:11px;color:#58a6ff}
+.exit{padding:2px 0;font-size:11.5px}
+.exit b{color:#dbe3ec}
+.api{display:flex;align-items:baseline;gap:7px;padding:2.5px 0}
+.api .own{font-size:10px;border-radius:4px;padding:1px 5px;flex:0 0 auto}
+.api .own.w{background:#12212f;color:#58a6ff;border:1px solid #24445e}
+.api .own.e{background:#26210f;color:#e0c069;border:1px solid #4a3c18}
+.api .note{color:#7d8794;font-size:11px;flex:1;min-width:0}
+.ul{margin:0;padding:0 0 0 16px}
+.ul li{padding:1.5px 0}
+.ul-rule li::marker{color:#58a6ff}
+.ul-acc li::marker{color:#3fb950}
+.ft{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:2px}
+.ft th{text-align:left;color:#7d8794;font-weight:600;font-size:10.5px;
+  padding:3px 6px 3px 0;border-bottom:1px solid #1d242d}
+.ft td{padding:4px 6px 4px 0;border-bottom:1px dashed #1d242d;
+  vertical-align:top;color:#c3ccd6}
+.ft td b{color:#dbe3ec}
+.ft tr:last-child td{border-bottom:0}
+code{background:#0b0f14;border:1px solid #212832;border-radius:4px;padding:0 4px;
+  font-family:ui-monospace,Consolas,monospace;font-size:.94em;color:#9fb2c4}
+
+/* 小地图 */
+.mini i.page,.mini i.var{background:#4a5460;border-color:#6b7280}
+.mini i.doc{background:#2a4a52}
+.mini i.blab{background:transparent;border:0}
+
+/* 弱化原型：读卡片时把原型压暗 */
+body.dim .el.page,body.dim .el.var{opacity:.26}
+
+/* 高亮落点框 */
+.an.hi{border-color:#58a6ff!important;border-width:2.5px!important;
+  background:rgba(88,166,255,.18)!important;box-shadow:0 0 0 2px rgba(88,166,255,.35);
+  animation:anpulse 1.1s ease-out 2}
+@keyframes anpulse{0%{background:rgba(88,166,255,.45)}100%{background:rgba(88,166,255,.18)}}
+
+/* ================= 页面级元素总表（侧栏底部） =================
+   需求卡片是**需求视角**（一条需求一张卡），这张表是**界面视角**（一个元素一行）。
+   放在侧栏最底部，默认折叠 —— 它是查阅型内容，不该顶在卡片流前面。 */
+/* 总表在 .side-b 内部（跟着卡片流一起滚），要抵消它的 9/11 内边距才能贴边 */
+.side-f{border-top:1px solid #1d242d;background:#0d1319;
+  margin:9px -11px -60px;padding-bottom:24px}
+.eltable{border:0}
+.elt-sum{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;
+  padding:11px var(--cpad-x);list-style:none;background:#12171d;
+  border-bottom:1px solid #1d242d}
+.elt-sum::-webkit-details-marker{display:none}
+.eltable[open] .caret{transform:rotate(90deg)}
+.elt-t{font-size:12.5px;font-weight:600;color:#dbe3ec}
+.elt-s{flex:1;min-width:0;font-size:11px;color:#7d8794;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.elt-b{padding:0 0 14px}
+
+.elpg{border-bottom:1px solid #161c24}
+.elpg:last-child{border-bottom:0}
+.elpg-h{display:flex;align-items:center;gap:7px;padding:8px var(--cpad-x) 6px;
+  position:sticky;top:0;background:#0d1319;z-index:2}
+.elpg-id{font-family:ui-monospace,Consolas,monospace;font-size:10.5px;color:#58a6ff;
+  background:#12212f;border:1px solid #24445e;border-radius:4px;padding:0 5px}
+.elpg-n{font-size:12px;font-weight:600;color:#c3ccd6;margin:0}
+.elpg-c{flex:1;text-align:right;font-size:10.5px;color:#7d8794}
+.elpg-c em{font-style:normal;margin:0 4px;color:#3d4650}
+.elpg-c .warn{color:#d29922}
+.elpg-c .fine{color:#3fb950}
+
+.elt{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+.elt th{text-align:left;color:#6d7783;font-weight:600;font-size:10px;
+  padding:0 var(--cpad-x) 4px;border-bottom:1px solid #161c24}
+.elt td{padding:4px var(--cpad-x);border-bottom:1px dashed #161c24;vertical-align:top;
+  color:#aab4bf}
+.elt th:first-child,.elt td:first-child{padding-left:var(--cpad-x)}
+.elt th:last-child,.elt td:last-child{padding-right:var(--cpad-x)}
+/* 三列定宽。侧栏 420px 减去两侧内边距后只有 ~395px，塞三列很紧：
+   元素名（等宽，最长见过 a1-canteen-orders）允许**省略号截断**而不是换行 ——
+   换行会把行高撑成两三倍，148 行扫读会散架。完整名字放 title 属性。
+   归属列给足宽度（要放「未归属 · 骨架」这种最长串）。 */
+.elt th:nth-child(1),.elt td:nth-child(1){width:46%}
+.elt th:nth-child(2),.elt td:nth-child(2){width:27%}
+.elt th:nth-child(3),.elt td:nth-child(3){width:27%}
+.elt tr.elrow:hover td{background:#131920}
+/* 未归属的行整行淡黄底 —— 一眼看出哪些元素没人管 */
+.elt tr.unc td{background:rgba(210,153,34,.07)}
+.elt tr.unc:hover td{background:rgba(210,153,34,.13)}
+/* 元素名截断不换行（完整名放 title），标签/位置允许一行到两行 */
+.el-n,.el-l{line-height:1.45}
+.el-el{display:block;color:#8b98a6;font-family:ui-monospace,Consolas,monospace;
+  font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el-k{display:block;color:#5f6a76;font-size:9.5px;margin-top:1px}
+.el-l{color:#c3ccd6;display:block}
+.el-p{display:block;color:#5f6a76;font-size:9.5px;margin-top:1px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.el-o{white-space:normal}
+.own{display:inline-block;font-family:ui-monospace,Consolas,monospace;font-size:10px;
+  background:#12212f;color:#58a6ff;border:1px solid #24445e;border-radius:4px;
+  padding:0 5px;margin:1px 3px 1px 0;cursor:pointer}
+.own:hover{background:#1a3350;border-color:#3d6f9e}
+.unc{display:inline-block;font-style:normal;font-size:10px;background:#26210f;
+  color:#e0c069;border:1px solid #4a3c18;border-radius:4px;padding:0 5px}
+
+/* 元素总表「点元素行」时闪一下的定位框：元素本身在原型图里没有独立 DOM，
+   临时造一个描边框告诉人「就是这里」。用亮青色与需求落点框的蓝色区分。 */
+.an.flash-hi{border:2.5px solid #39c5bb!important;background:rgba(57,197,187,.2)!important;
+  box-shadow:0 0 0 2px rgba(57,197,187,.4),0 0 26px 6px rgba(57,197,187,.35)!important;
+  border-radius:5px;pointer-events:none;z-index:8;animation:flpulse 1s ease-out 2}
+@keyframes flpulse{0%{background:rgba(57,197,187,.5)}100%{background:rgba(57,197,187,.2)}}

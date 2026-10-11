@@ -1,0 +1,71 @@
+{
+  "count": 4,
+  "entries": [
+    {
+      "id": "c-0001",
+      "type": "component",
+      "name": "加载按钮（原地变 Spinner + 宽度锁定）",
+      "tags": [
+        "button",
+        "loading",
+        "防重复提交",
+        "feedback"
+      ],
+      "summary": "提交类按钮点击后原地变为 Spinner 并锁定原宽度，避免布局跳动与重复点击",
+      "license": "original",
+      "status": "active",
+      "usedBy": [],
+      "path": "components/c-0001-loading-button.md"
+    },
+    {
+      "id": "c-0002",
+      "type": "component",
+      "name": "只读金额字段（服务端口径不可自造）",
+      "tags": [
+        "money",
+        "readonly",
+        "资金",
+        "整数分",
+        "服务端下发"
+      ],
+      "summary": "金额一律以整数分从服务端下发、前端只做展示格式化；任何前端参与计算的金额都必须标为「估算值」",
+      "license": "original",
+      "status": "active",
+      "usedBy": [],
+      "path": "components/c-0002-readonly-money-field.md"
+    },
+    {
+      "id": "m-0001",
+      "type": "motion",
+      "name": "骨架屏微光（Skeleton Shimmer）",
+      "tags": [
+        "loading",
+        "占位",
+        "首屏",
+        "感知性能"
+      ],
+      "summary": "用与真实内容同构的灰块占位，叠一道横向扫过的线性渐变微光，替代转圈",
+      "license": "original",
+      "status": "active",
+      "usedBy": [],
+      "path": "motions/m-0001-skeleton-shimmer.md"
+    },
+    {
+      "id": "p-0001",
+      "type": "pattern",
+      "name": "乐观提交 + 可回滚（Optimistic Submit）",
+      "tags": [
+        "form",
+        "提交",
+        "回滚",
+        "离线",
+        "交互模式"
+      ],
+      "summary": "高成功率操作先本地落态再提交，失败时回滚并保留用户输入，而不是让用户重填",
+      "license": "original",
+      "status": "active",
+      "usedBy": [],
+      "path": "patterns/p-0001-optimistic-submit.md"
+    }
+  ]
+}

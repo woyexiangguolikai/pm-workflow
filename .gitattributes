@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────
+#  行尾统一 —— 这个仓库要在 Windows / macOS / Linux 上都能用
+#  没有这份文件时：Windows 检出会得到 CRLF，提交时反复出现
+#  「LF will be replaced by CRLF」警告，且 diff 会因行尾差异虚增。
+# ─────────────────────────────────────────────────────────
+
+# 仓库内一律存 LF，检出也一律 LF。
+# 对本仓库的文件类型（Python / Markdown / JSON / JS / CSS / HTML）LF 在三个平台上都正常，
+# 而 CRLF 会给 macOS / Linux 用户带来麻烦（尤其 .sh 直接报 bad interpreter）。
+* text=auto eol=lf
+
+# 二进制文件不要做行尾转换
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.pdf  binary
+*.zip  binary
+
+# 下列类型显式声明为文本（避免被误判为二进制而跳过 diff）
+*.md    text
+*.py    text
+*.json  text
+*.jsonl text
+*.js    text
+*.jsx   text
+*.css   text
+*.html  text
+*.yml   text
+*.yaml  text
+*.toml  text
+*.ps1   text
+
+# Git 统计时把这些当文档而非代码，免得「语言构成」被 Markdown 淹没
+*.md   linguist-documentation
+*.json linguist-language=JSON
