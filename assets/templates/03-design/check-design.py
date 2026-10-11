@@ -187,7 +187,7 @@ tech_must = [
     ('页面路径', r'pages/[a-z0-9\-/]+', 12),
     ('后台路径', r'\badmin/[a-z\-]+', 11),
     ('十六进制色值', r'#[0-9a-fA-F]{6}', 60),
-    ('主题语义键', r'\b(?:font_color_readable|discount_font|downgrade_notice|yikatong_brand)\b', 4),
+    ('主题语义键', r'\b(?:font_color_readable|discount_font|downgrade_notice|channel_brand)\b', 4),
     ('锚点 id', r'>[a-z][a-z0-9]*-[a-z0-9\-]*<', 20),
 ]
 tech_bad = 0

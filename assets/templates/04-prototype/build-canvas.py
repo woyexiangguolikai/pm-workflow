@@ -42,10 +42,10 @@ FOOT_H = 26           # 卡底
 CARD_W_BY_END = {'app': CARD_W, 'admin': ADMIN_CARD_W}
 
 GROUPS = [
-    {'end': 'app', 'name': '一卡通账户', 'mods': 'M1', 'pages': ['PG-A1', 'PG-A2', 'PG-A3'],
+    {'end': 'app', 'name': '用户账户', 'mods': 'M1', 'pages': ['PG-A1', 'PG-A2', 'PG-A3'],
      'note': '绑定、查看、解绑与换卡，围绕「一人一卡」的完整生命周期'},
     {'end': 'app', 'name': '下单与支付', 'mods': 'M2 · M3 · M6', 'pages': ['PG-A6', 'PG-A4', 'PG-A5'],
-     'note': '按真实使用顺序排：购物车看折后价 → 收银台选一卡通 → 支付结果'},
+     'note': '按真实使用顺序排：购物车看折后价 → 收银台选渠道 → 支付结果'},
     {'end': 'app', 'name': '员工身份', 'mods': 'M5', 'pages': ['PG-A7'],
      'note': '折扣的前提：能被识别成在职员工'},
     {'end': 'app', 'name': '订单与退款', 'mods': 'M4 · M8', 'pages': ['PG-A8', 'PG-A9'],
@@ -320,7 +320,7 @@ def build():
 
     # ---- HUD
     hud_left = ('<span class="logo">原型白板</span>'
-                '<span class="sub">校园订餐 · 一卡通支付与员工折扣 · 04-prototype</span>')
+                '<span class="sub">{{项目名}} · 04-prototype</span>')
     hud_right = (
         '<div class="panel"><div class="seg" id="fEnd">'
         '<button class="on" data-e="all">全部端</button>'

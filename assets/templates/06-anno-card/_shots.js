@@ -44,7 +44,7 @@ function flyCardView(br, k) {
 
 const VIEWS = [
   { n: '01-全貌', act: 'window.__fit__(60)' },
-  { n: '02-小程序泳道-一卡通账户', act: 'window.__centerOn__(document.querySelector(\'.el.page[data-id="PG-A1"]\'),0.9)' },
+  { n: '02-小程序泳道-用户账户', act: 'window.__centerOn__(document.querySelector(\'.el.page[data-id="PG-A1"]\'),0.9)' },
   { n: '03-小程序泳道-下单支付', act: 'window.__centerOn__(document.querySelector(\'.el.page[data-id="PG-A4"]\'),0.75)' },
   { n: '04-后台泳道-员工与折扣', act: 'window.__centerOn__(document.querySelector(\'.el.page[data-id="PG-B6"]\'),0.62)' },
   { n: '05-后台泳道-对账结算', act: 'window.__centerOn__(document.querySelector(\'.el.page[data-id="PG-B9"]\'),0.7)' },

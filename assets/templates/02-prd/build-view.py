@@ -21,14 +21,16 @@ TPL = r'''<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PRD · 企业订餐一卡通支付与员工折扣</title>
+<title>PRD · {{项目名}}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0d1117;--card:#161b22;--card2:#1c2128;--card3:#21262d;--border:#30363d;
   --text:#e6edf3;--text2:#8b949e;--text3:#6e7681;
   --green:#3fb950;--amber:#d29922;--red:#f85149;--accent:#58a6ff;--purple:#bc8cff;--teal:#39c5bb;
-  --lane-app:#7ee787;--lane-srv:#bc8cff;--lane-ytk:#58a6ff;--lane-admin:#e3b341;--lane-hr:#39c5bb;
+  /* 泳道 = SKILL.md 的端枚举（固定）：用户小程序/管理后台/收银端/商家端/服务端 + 外部系统 */
+  --lane-app:#7ee787;--lane-admin:#e3b341;--lane-pos:#39c5bb;--lane-mch:#f0883e;
+  --lane-srv:#bc8cff;--lane-ext:#58a6ff;
 }
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.7;-webkit-font-smoothing:antialiased}
@@ -206,7 +208,7 @@ footer code{font-family:ui-monospace,Consolas,monospace;color:var(--text2)}
 <body class="biz">
 <div class="layout">
   <aside class="side">
-    <div class="side-h"><div class="t">企业订餐 · 一卡通支付与员工折扣</div><div class="s">PRD v1.3 · 2026-10-07</div></div>
+    <div class="side-h"><div class="t">{{项目名}}</div><div class="s">PRD v1.0 · {{日期}}</div></div>
     <div class="side-search"><input id="search" placeholder="搜索需求编号 / 标题 / 关键词…"></div>
     <nav class="nav" id="nav"></nav>
   </aside>
@@ -214,8 +216,8 @@ footer code{font-family:ui-monospace,Consolas,monospace;color:var(--text2)}
     <div class="topbar" id="top-anchor">
       <div class="tb-l">
         <div class="eyebrow">02 · PRD 阶段交付物</div>
-        <h1>企业订餐系统 · 一卡通支付与内部员工折扣</h1>
-        <div class="meta">PRD v1.5 · 2026-10-07 · 试点范围：企业订餐系统<span class="stage">42 条需求已完整展开</span></div>
+        <h1>{{项目名}}</h1>
+        <div class="meta">PRD {{版本}} · {{日期}}<span class="stage" id="reqstat"></span></div>
       </div>
       <div class="viewsw" id="viewsw">
         <button data-v="biz" class="on">业务视图</button>
@@ -241,7 +243,7 @@ footer code{font-family:ui-monospace,Consolas,monospace;color:var(--text2)}
     <div id="body"></div>
 
     <div class="sect" id="apx-flow"><h2>附录 A · 跨需求端到端流程图</h2><div class="desc">按时间顺序的流程链，色标表示所在端；覆盖跨功能的完整链路</div><div id="flows"></div></div>
-    <div class="sect" id="apx-api"><h2>附录 B · 一卡通平台接口清单</h2><div class="desc">卡片内只写该需求用到的部分，完整清单在此</div><div id="apis"></div></div>
+    <div class="sect" id="apx-api"><h2>附录 B · 外部渠道接口清单</h2><div class="desc">卡片内只写该需求用到的部分，完整清单在此</div><div id="apis"></div></div>
     <div class="sect" id="apx-svc"><h2>附录 C · 我方内部服务能力</h2><div class="desc">本系统对外提供的服务能力，供前端与后台共用</div><div id="svcs"></div></div>
     <div class="sect" id="apx-mod"><h2>附录 D · 需改动的存量模块</h2><div class="desc">依据 00-audit 源码盘点结论</div><div id="mods"></div></div>
     <div class="sect" id="apx-field"><h2>附录 E · 新增字段与枚举</h2><div id="fields"></div></div>
@@ -254,7 +256,7 @@ footer code{font-family:ui-monospace,Consolas,monospace;color:var(--text2)}
 
     <footer>
       数据源 <code>prd.json</code> · 叙述文档 <code>PRD.md</code> · 本视图由 <code>build-view.py</code> 从数据源生成，两者不漂移<br>
-      上游依据：<code>00-audit/audit.json</code>（存量源码盘点 140 张表） · <code>01-requirements/requirement.json</code>（26 个需求槽位） · 《一卡通Api接口文档》
+      上游依据：<code>00-audit/audit.json</code>（存量源码盘点 140 张表） · <code>01-requirements/requirement.json</code>（26 个需求槽位） · 《渠道Api接口文档》
     </footer>
   </main>
 </div>
@@ -266,11 +268,10 @@ var DATA = __DATA__;
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function el(id){return document.getElementById(id);}
-function endCls(e){return e==='用户小程序'?'app':(e==='服务端'?'srv':'admin');}
-function laneColor(e){
-  return e==='用户小程序'?'var(--lane-app)':e==='服务端'?'var(--lane-srv)':
-         e==='管理后台'?'var(--lane-admin)':e==='甲方人事系统'?'var(--lane-hr)':'var(--lane-ytk)';
-}
+/* 端枚举 → 泳道。端名必须来自 SKILL.md 的固定枚举，端枚举之外的参与方一律归 ext。 */
+var LANE={'用户小程序':'app','管理后台':'admin','收银端':'pos','商家端':'mch','服务端':'srv'};
+function endCls(e){return LANE[e]||'ext';}
+function laneColor(e){return 'var(--lane-'+endCls(e)+')';}
 
 var modName={},funcName={},reqOf={},pagePath={};
 DATA.modules.forEach(function(m){
@@ -280,6 +281,9 @@ DATA.modules.forEach(function(m){
   });
 });
 DATA.requirements.forEach(function(r){reqOf[r.id]=r;});
+/* 铁律 2：期望值一律从数据源现算。改了 prd.json，这里的数字必须跟着变 ——
+   写成字面量的话，数据源改了它照样显示旧数，等于骗人。 */
+(function(){var s=el('reqstat');if(s){s.textContent=DATA.requirements.length+' 条需求已完整展开';}})();
 ['app','admin'].forEach(function(s){ (DATA.pages[s]||[]).forEach(function(p){pagePath[p.name]=p.path;}); });
 
 /* 业务/技术视图切换 */
@@ -297,7 +301,7 @@ function ifaceLabel(x,withNote){
   var s=DATA.stats;
   var items=[
     ['i',s.requirements,'需求条目'],['o',s.modules,'模块'],['o',s.functions,'功能'],
-    ['',(s.appPages||0)+(s.adminPages||0),'涉及页面'],['',s.interfaces,'一卡通接口'],
+    ['',(s.appPages||0)+(s.adminPages||0),'涉及页面'],['',s.interfaces,'渠道接口'],
     ['o',s.fieldsWithSpec||0,'字段规格'],['o',s.displayFieldRows||0,'页面展示字段'],['o',s.inputRuleRows||0,'输入限制'],
     ['o',s.dataSpecRows||0,'格式规范'],['p',s.detailFull,'完整卡片'],['d',s.detailBasic,'待补全'],
     ['w',s.openQuestions,'已定决策'],['d',s.risks,'风险'],['o',s.flowDiagrams,'流程图']
@@ -322,7 +326,7 @@ function ifaceLabel(x,withNote){
   });
   h+='<div class="sep"></div>';
   h+='<a href="#apx-flow" class="lv1">附录</a>';
-  [['apx-flow','A 端到端流程图'],['apx-api','B 一卡通接口清单'],['apx-svc','C 我方内部服务'],
+  [['apx-flow','A 端到端流程图'],['apx-api','B 渠道接口清单'],['apx-svc','C 我方内部服务'],
    ['apx-mod','D 需改动存量模块'],['apx-field','E 新增字段与枚举'],['apx-gloss','F 术语表'],
    ['apx-open','G 待确认与决策'],['apx-risk','H 风险清单'],['apx-ac','I 验收标准汇总'],
    ['apx-motion','J 动效与微交互规范'],['apx-dataspec','K 数据格式与精度规范']].forEach(function(a){
@@ -499,7 +503,7 @@ function fullBody(r){
   var io=r.interfaces||{ours:[],external:[]};
   var ifr=[];
   (io.ours||[]).forEach(function(x){ifr.push(['我方服务', ifaceLabel(x,true)]);});
-  (io.external||[]).forEach(function(x){ifr.push(['一卡通平台', ifaceLabel(x,true)]);});
+  (io.external||[]).forEach(function(x){ifr.push(['外部渠道', ifaceLabel(x,true)]);});
   if(ifr.length){ link+='<div class="subt'+(r.fields.length?'':' first')+'">接口</div>'+tableHTML(['侧','接口'],ifr); }
   var anc=r.landing?r.landing.anchor:'';
   link+='<div class="subt">原型锚点与流程图</div><div class="chips">'+
@@ -534,7 +538,7 @@ function basicBody(r){
   var io=r.interfaces||{ours:[],external:[]};
   var ifr=[];
   (io.ours||[]).forEach(function(x){ifr.push(['我方服务', ifaceLabel(x,false)]);});
-  (io.external||[]).forEach(function(x){ifr.push(['一卡通平台', ifaceLabel(x,false)]);});
+  (io.external||[]).forEach(function(x){ifr.push(['外部渠道', ifaceLabel(x,false)]);});
   var link='';
   if(ifr.length) link+=tableHTML(['侧','接口'],ifr);
   if(r.landing) link+='<div style="margin-top:10px" class="chips"><span class="chip anchor tech-only">#'+esc(r.landing.anchor)+'</span><span class="chip biz-only">'+esc(r.landing.page)+'</span><span class="chip tech-only">'+esc(r.landing.page)+' · '+esc(r.landing.pagePath)+'</span></div>';
@@ -597,9 +601,9 @@ function renderAppendix(){
       '<div class="fchain">'+chain+'</div></div>';
   }).join('');
 
-  /* B 一卡通接口 */
+  /* B 渠道接口 */
   el('apis').innerHTML=table2(['接口','编号','技术路径','方法','用途','关联需求'],
-    DATA.interfaces.yikatong.map(function(a){
+    DATA.interfaces.channel.map(function(a){
       return ['<span style="color:var(--text)">'+esc(a.business||a.name)+'</span>',
               '<code>'+esc(a.id)+'</code>','<code>'+esc(a.path)+'</code>',esc(a.method),esc(a.purpose),
               (a.usedBy||[]).map(esc).join(' / ')];
@@ -635,9 +639,9 @@ function renderAppendix(){
   fh+='<div class="desc" style="margin-top:20px">复用字段（同时补上规格，便于对照）</div>'+table2(FD_COLS, fieldRows(DATA.fields.reusedFields||[]), FD_TECH);
   fh+='<div class="desc" style="margin-top:20px">新增枚举</div>'+table2(['枚举','取值','业务上怎么问'],
     DATA.fields.newEnums.map(function(e){return ['<span style="color:var(--text)">'+esc(e.name)+'</span>',esc(e.values),esc(e.businessAsk||'—')];}));
-  fh+='<div class="tech-only"><div class="desc" style="margin-top:20px">我方字段 ⇄ 一卡通字段对照</div>'+table2(['我方字段','一卡通字段','说明'],
-    DATA.fields.mapping.map(function(m){return ['<span style="color:var(--text)">'+esc(m.ours)+'</span>','<code>'+esc(m.yikatong)+'</code>',esc(m.note)];}))+'</div>';
-  fh+='<div class="biz-only note blue" style="margin-top:18px">字段级对照（我方字段名 ⇄ 一卡通字段名）属于开发实现细节，切到<strong>技术视图</strong>查看。</div>';
+  fh+='<div class="tech-only"><div class="desc" style="margin-top:20px">我方字段 ⇄ 渠道字段对照</div>'+table2(['我方字段','渠道字段','说明'],
+    DATA.fields.mapping.map(function(m){return ['<span style="color:var(--text)">'+esc(m.ours)+'</span>','<code>'+esc(m.channel)+'</code>',esc(m.note)];}))+'</div>';
+  fh+='<div class="biz-only note blue" style="margin-top:18px">字段级对照（我方字段名 ⇄ 渠道字段名）属于开发实现细节，切到<strong>技术视图</strong>查看。</div>';
   el('fields').innerHTML=fh;
 
   /* F 术语表 */

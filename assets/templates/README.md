@@ -11,6 +11,34 @@ cp <skill>/assets/templates/04-prototype/_canvas_html.py projects/<新项目>/04
 
 ---
 
+## 🔴 模板必须是中性的 —— 不许带任何项目的痕迹
+
+模板是要被**拷贝进下一个项目**的。里面只要留着上一个项目的名字、业务实体、泳道角色
+或写死的数字，拷贝的人就会把它们当成"本来就该这样"，继承一整套错的东西。
+
+真实发生过：这批模板一度直接写着某个项目的标题、它的支付渠道、它的甲方系统名，
+甚至写着 `42 条需求` 这种字面量 —— **模板自己违反了工作流铁律 2（期望值从数据源现算）**。
+
+**约定**
+
+| 类别 | 写法 |
+|---|---|
+| 项目名 / 版本 / 日期 | `{{项目名}}` `{{版本}}` `{{日期}}` —— **故意做成显眼**，没替换时会留在产物里 |
+| 业务实体 | 用中性概念（`外部渠道` / `外部系统`），不要用某个项目的具体产品名 |
+| 参与方 / 泳道 | 只能用 SKILL.md 的**端枚举**（用户小程序 / 管理后台 / 收银端 / 商家端 / 服务端），端枚举之外的一律归 `外部系统` |
+| 数量 / 统计 | **从数据源现算**，不许写字面量 |
+
+**守卫**（改完模板跑一次，要求 `BLOCK 0`）：
+
+```bash
+python scripts/check-templates-clean.py .        # 扫项目词 / 写死标题 / 已下线阶段 / 泳道端枚举
+python scripts/check-templates-clean.py --selftest
+```
+
+---
+
+---
+
 ## 哪些是「直接可用」，哪些是「要改」
 
 | 类别 | 文件 | 说明 |
@@ -68,12 +96,24 @@ $env:NODE_PATH = "$env:USERPROFILE\.workbuddy\binaries\node\workspace\node_modul
 # 04 原型
 cd 04-prototype && python _viewpad.py && python build-proto.py && python build-canvas.py && python check-proto.py && python _preview_shots.py
 
-# 05 标注
-cd 05-annotation && python build-anno.py && python check-anno.py && python _preview_shots.py
-
-# 06 卡片画布（推荐形态）
+# 06 卡片画布（交付链末层，**05 标注已下线，不要再用**）
 cd 06-anno-card && python build-card-canvas.py && python check-card-view.py && node _verify.js && node _shots.js
 
 # 02 PRD
 cd 02-prd && python build-view.py && python build-doc.py && python check-biz-lang.py
 ```
+
+---
+
+## ⚠️ 已知缺口：00 / 01 还没有脚本模板
+
+`00-audit/` 与 `01-requirements/` 目前**只有数据模型**（见
+`references/00-audit-and-01-requirements.md`），没有可拷贝的构建脚本 ——
+`check-templates-clean.py` 会一直报 `T5` 的 WARN，**这是真的没做，不是误报**。
+
+在补上之前，这两个阶段的 `*.html` 视图需要按该文档的数据模型自写脚本，
+约束与 02 一样：**HTML 由脚本生成、期望值从 JSON 现算**。
+
+> 不要把 00 / 01 加进 `NO_TEMPLATE_STAGES` 来消掉这条 WARN ——
+> 它们**结构上需要脚本**（要产出 HTML 视图），登记成"不需要"就是把缺口藏起来。
+> 只有 03b 那种"结构上不随项目建目录"的阶段才可以登记。

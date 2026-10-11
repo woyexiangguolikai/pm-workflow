@@ -13,12 +13,17 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 d = json.load(io.open(os.path.join(BASE, 'prd.json'), encoding='utf-8'))
 MD = os.path.join(BASE, 'PRD.md')
 
+# 🔴 泳道必须对齐 SKILL.md「端枚举（固定，全流程统一）」：
+#    用户小程序 / 管理后台 / 收银端 / 商家端 / 服务端。
+#    本项目若还有端枚举之外的参与方（外部系统等），归到 '外部系统' 一条，
+#    **不要发明新端** —— 端名一改，04/06 的过滤与统计全都要跟着改。
 LANE_STYLE = {
     '用户小程序': ('laneApp', '#3fb950'),
-    '服务端': ('laneSrv', '#bc8cff'),
     '管理后台': ('laneAdmin', '#d29922'),
-    '甲方一卡通平台': ('laneYtk', '#58a6ff'),
-    '甲方人事系统': ('laneHr', '#39c5bb'),
+    '收银端': ('lanePos', '#39c5bb'),
+    '商家端': ('laneMch', '#f0883e'),
+    '服务端': ('laneSrv', '#bc8cff'),
+    '外部系统': ('laneExt', '#58a6ff'),
 }
 CN = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'
 
@@ -264,7 +269,7 @@ def card_md(r):
         for x in (io_.get('ours') or []):
             o.append('| 我方服务 | %s %s | %s |' % (x['id'], esc(x.get('business') or x.get('name', '')), esc(x.get('note', ''))))
         for x in (io_.get('external') or []):
-            o.append('| 一卡通平台 | %s %s | %s |' % (x['id'], esc(x.get('business') or x.get('name', '')), esc(x.get('note', ''))))
+            o.append('| 外部渠道 | %s %s | %s |' % (x['id'], esc(x.get('business') or x.get('name', '')), esc(x.get('note', ''))))
         o.append('')
 
     if r.get('landing'):
@@ -349,10 +354,10 @@ def fields_md():
     for e in d['fields']['newEnums']:
         o.append('| %s | %s | %s |' % (esc(e['name']), esc(e['values']), esc(e.get('businessAsk', '—'))))
     if d['fields'].get('mapping'):
-        o += ['', '我方字段 ⇄ 一卡通字段对照（开发细节）：', '',
-              '| 我方字段 | 一卡通字段 | 说明 |', '| --- | --- | --- |']
+        o += ['', '我方字段 ⇄ 渠道字段对照（开发细节）：', '',
+              '| 我方字段 | 渠道字段 | 说明 |', '| --- | --- | --- |']
         for m in d['fields']['mapping']:
-            o.append('| %s | `%s` | %s |' % (esc(m['ours']), esc(m['yikatong']), esc(m['note'])))
+            o.append('| %s | `%s` | %s |' % (esc(m['ours']), esc(m['channel']), esc(m['note'])))
 
     ds = d.get('dataSpec') or {'rows': []}
     o += ['', '### 16.4 %s' % ds.get('title', '数据格式与精度规范'), '',
@@ -412,14 +417,14 @@ def tail_md():
             '| | 业务视图（默认） | 技术视图 |',
             '| --- | --- | --- |',
             '| 面向 | 业务侧领导、客户、测试 | 开发实现 |',
-            '| 接口 | 显示业务名（如「查询一卡通绑定状态」） | 附编号与技术名（如 `SVC-004 查询绑定状态`） |',
-            '| 字段 | 显示业务名（如「一卡通绑定状态」） | 附 `表.字段` 与枚举值 |',
+            '| 接口 | 显示业务名（如「查询渠道绑定状态」） | 附编号与技术名（如 `SVC-004 查询绑定状态`） |',
+            '| 字段 | 显示业务名（如「渠道绑定状态」） | 附 `表.字段` 与枚举值 |',
             '| 页面 | 只显示页面名称（如「我的钱包」） | 附页面路径（如 `pages/user/my-wallet/my-wallet`） |',
-            '| 锚点 | 隐藏 | 显示（如 `#wallet-yikatong-entry`） |',
+            '| 锚点 | 隐藏 | 显示（如 `#wallet-channel-entry`） |',
             '',
             '**原则：业务文案里不出现表名、字段名、页面路径、接口编号。**'
             '技术细节统一由"业务名 + 技术标识"双轨承载 —— 业务视图读得懂，技术视图不丢信息。', '',
-            '### 15.4 卡片模型样板（F1-1 一卡通绑定，4 条需求）', '',
+            '### 15.4 卡片模型样板（F1-1 渠道绑定，4 条需求）', '',
             '> 本节的每一条都由 `prd.json` 自动生成，与 HTML 视图同源。',
             '> 其余 38 条按同一模型展开，完整卡片见 `PRD.html`。', '']
     for rid in ('BR-101', 'BR-102', 'BR-103', 'BR-106'):

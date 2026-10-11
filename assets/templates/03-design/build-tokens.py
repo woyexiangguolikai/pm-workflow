@@ -73,8 +73,8 @@ NEW_THEME_KEYS = [
     {'key': 'downgrade_notice', 'name': '降级警示色', 'fixed': '#b54708',
      'use': '余额不足自动降级提示、需要用户行动的警示',
      'derivation': '固定语义色（不随主题），取自 semantic.warning 的可读值'},
-    {'key': 'yikatong_brand', 'name': '一卡通品牌标识色', 'fixed': '#1c5fd4',
-     'use': '一卡通的图标、标签、渠道标识；用于区分「甲方平台能力」与「商家自有功能」',
+    {'key': 'channel_brand', 'name': '渠道品牌标识色', 'fixed': '#1c5fd4',
+     'use': '渠道的图标、标签、渠道标识；用于区分「甲方平台能力」与「商家自有功能」',
      'derivation': '固定品牌标识色（不随商家主题），保证跨主题识别一致'},
 ]
 
@@ -108,7 +108,7 @@ SEMANTIC_TO_THEME = [
     {'token': 'color.primaryBorder', 'key': 'border_color', 'use': '品牌色边框、选中描边'},
     {'token': 'color.discount', 'key': 'discount_font', 'use': '折扣金额、让利金额'},
     {'token': 'color.downgrade', 'key': 'downgrade_notice', 'use': '余额不足降级警示'},
-    {'token': 'color.brandMark.yikatong', 'key': 'yikatong_brand', 'use': '一卡通渠道标识'},
+    {'token': 'color.brandMark.channel', 'key': 'channel_brand', 'use': '渠道品牌标识'},
 ]
 
 
@@ -146,7 +146,7 @@ def derive_theme(tname):
         'font_color_readable': brand_text,
         'discount_font': '#c2410c',
         'downgrade_notice': '#b54708',
-        'yikatong_brand': '#1c5fd4',
+        'channel_brand': '#1c5fd4',
     }
     out['newKeys'] = newk
     out['derived'] = {
@@ -164,7 +164,7 @@ def derive_theme(tname):
     chk('%s 品牌色边框/白底(非文字)' % tname, border, WHITE, TARGET_NONTEXT, 'nontext')
     chk('%s 折扣金额/白底' % tname, newk['discount_font'], WHITE, TARGET_TEXT)
     chk('%s 降级警示/白底' % tname, newk['downgrade_notice'], WHITE, TARGET_TEXT)
-    chk('%s 一卡通标识/白底' % tname, newk['yikatong_brand'], WHITE, TARGET_TEXT)
+    chk('%s 渠道标识/白底' % tname, newk['channel_brand'], WHITE, TARGET_TEXT)
 
     out['a11y'] = {
         'brandTextOnWhite': round(brand_text_r, 2),
@@ -459,7 +459,7 @@ TOKENS = {
     'semantic': SEMANTIC,
     'themeContract': {
         'note': '小程序端 7 套商家品牌主题的语义键契约。存量 17 键保留可用；'
-                '新增 4 键为最小扩充（折扣金额色 / 降级警示色 / 一卡通标识色 / 可读文字变体）。'
+                '新增 4 键为最小扩充（折扣金额色 / 降级警示色 / 渠道标识色 / 可读文字变体）。'
                 '业务代码只引用「语义 Token → 主题键」映射表左侧的名字，不直接写主题键名。',
         'keysLegacy': LEGACY_THEME_KEYS,
         'keysNew': NEW_THEME_KEYS,

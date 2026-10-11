@@ -2,7 +2,7 @@
 name: pm-workflow
 description: 产品经理全流程工作流：盘点 → 需求 → PRD → 设计规范 → 组件库 → 原型 → 需求卡片画布。每阶段产出「JSON 数据源 + HTML 自包含视图」双格式，单一数据源驱动、脚本自校验 + 变异测试，每阶段末尾闭合质量反馈环路（rubric 自评 + 反例库 + 评审流水）。当用户要写 PRD、做需求规格、定设计规范、建组件库、画高保真原型、做需求卡片、把需求与原型关联、盘点存量系统、或提到「产品经理工作流」「PM 工作流」「需求卡片」「原型画布」时使用。
 metadata:
-  ai.workbuddy.version: 1.1.9
+  ai.workbuddy.version: 1.2.0
   ai.workbuddy.author: llllll
   ai.workbuddy.homepage: ""
 ---
@@ -181,6 +181,11 @@ projects/<项目名>/
 
 脚本从 `assets/templates/<阶段>/` 拷过去改。**脚本与数据源同目录**（相对路径可用）。
 
+> 🔴 **模板必须是中性的** —— 不许带任何项目的痕迹（项目名、业务实体、泳道角色、写死的数字）。
+> 拷贝它的人会把这些当成"本来就该这样"，继承一整套错的东西。
+> 项目名 / 版本 / 日期一律写成 `{{项目名}}` `{{版本}}` `{{日期}}`；参与方只能用下面的**端枚举**。
+> 改完模板跑 `python scripts/check-templates-clean.py .`，要求 `BLOCK 0`。
+
 ### 第 3 步：写构建脚本 → 生成视图
 
 ### 第 4 步：写校验脚本 + 变异测试，跑绿
@@ -274,7 +279,12 @@ python <skill>/scripts/build-manual.py --out ./_manual
 但**必须重新定标**（`_viewpad.py` 实测视口偏移，它跟 Edge 版本与系统 DPI 有关）。
 逐步清单见 `references/setup-and-migration.md`。
 
-**发布 / 分享给别人** → 见 `PUBLISHING.md`（发布前必须跑 `scripts/check-publish-safe.py .` 到 `0 BLOCK`）。
+**发布 / 分享给别人** → 见 `PUBLISHING.md`（发布前必须跑下面两条到 `0 BLOCK`）：
+
+```bash
+python scripts/check-publish-safe.py .        # 密钥 / PII / 本机路径 / 项目词
+python scripts/check-templates-clean.py .     # 模板洁净度（项目词 / 写死标题 / 已下线阶段 / 泳道端枚举）
+```
 
 ---
 

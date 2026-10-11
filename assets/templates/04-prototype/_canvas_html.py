@@ -490,10 +490,10 @@ apply();
 
 
 def render(world_html, payload, stats, hud_left, hud_right, hud_br, hud_bl,
-           extra_css='', extra_js='', bodycls='biz', title='原型白板 · 一卡通支付与员工折扣',
+           extra_css='', extra_js='', bodycls='biz', title='原型白板',
            world_extra='', body_extra=''):
-    """extra_css / extra_js 给 05-annotation 复用：那套画布要在世界层里再插一个
-    SVG 连线层、加一批元素热区，但缩放平移、灯箱、双视图这套引擎一模一样。
+    """extra_css / extra_js 给同阶段的其他画布复用：另一套画布要在世界层里再插一个
+    自己的图层、加一批元素热区，但缩放平移、灯箱、双视图这套引擎一模一样。
     复制一份 _canvas_html 出来改是最糟的做法 —— 引擎一改就得改两处，
     而漏改的那一处不会报错，只会在某个视角下看着不对。
 

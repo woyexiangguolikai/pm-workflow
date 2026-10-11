@@ -75,7 +75,8 @@ PROBE = """
     o.push({anchor:e.getAttribute('data-anchor'),x:a.x,y:a.y,w:a.w,h:a.h,
             rx:q.rx,ry:q.ry});
   });
-  // 交互点：一个具体元素（按钮 / 跳转入口 / tab / 开关 …）。05-annotation 的连线从这些出发。
+  // 交互点：一个具体元素（按钮 / 跳转入口 / tab / 开关 …）。06 卡片画布按这些点关联需求。
+  // （05 连线标注已下线，交互点由 06 卡片承载，不再有连线起点/终点。）
   document.querySelectorAll('[data-el]').forEach(function(e){
     var a=r(e), q=rel(a);
     eo.push({el:e.getAttribute('data-el'),kind:e.getAttribute('data-kind')||'',
@@ -463,7 +464,7 @@ def main():
         for e in r['elements']:
             kinds[e['kind']] = kinds.get(e['kind'], 0) + 1
     # 每个元素的**标准落位**：按画面顺序取第一次出现的那张，
-    # 05-annotation 画热区框与连线端点一律用它，避免同一个元素在两处各画一个框。
+    # 06 卡片画布定位交互点一律用它，避免同一个元素在两处各画一个框。
     el_home = {}
     for r in recs:
         for e in r['elements']:

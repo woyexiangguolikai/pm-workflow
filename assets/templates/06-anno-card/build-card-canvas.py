@@ -672,7 +672,7 @@ def build():
     )
 
     hud_left = ('<span class="logo">需求卡片画布</span>'
-                '<span class="sub">校园订餐 · 一卡通支付与员工折扣 · 06-anno-card</span>')
+                '<span class="sub">{{项目名}} · 06-anno-card</span>')
     hud_right = ('<div class="panel">'
                  '<button class="btn" id="tAnno">锚点框</button>'
                  '<button class="btn" id="tDim">弱化原型</button>'
@@ -698,7 +698,7 @@ def build():
                     extra_css=open(CARD_CSS, encoding='utf-8').read(),
                     extra_js='<script>%s</script>' % open(CARD_JS, encoding='utf-8').read(),
                     bodycls='biz',
-                    title='需求卡片画布 · 一卡通支付与员工折扣',
+                    title='需求卡片画布 · {{项目名}}',
                     world_extra='', body_extra=panel)
 
     with open(OUT_HTML, 'w', encoding='utf-8') as f:
