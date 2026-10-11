@@ -373,6 +373,21 @@ curl.exe -s https://api.github.com/repos/woyexiangguolikai/pm-workflow/git/commi
 > （含 `date`，用 `+08:00` 形式）与**完整消息**，GitHub 会复现出与本地**完全相同**的 sha。
 > 注意消息**不要 `.strip()`** —— 尾换行少一个字节，整个对象就不同了。
 
+> 📌 **凭据从哪来（本轮实测，此前卡住过）**：本机配的 helper 是 GCM，但它在沙箱里**起不来** ——
+> `git credential fill` 的表现是**挂死**：硬超时 20s，无输出、无报错、`exit 124`。
+> ⚠️ **这和「没配凭据」在现象上分不出来**，很容易被引到「凭据丢了、要重新登录」的错误结论上。
+> 同一个 bin 目录下的 **`git-credential-wincred.exe` 可以直接用**（它读 Windows 凭据管理器）：
+>
+> ```bash
+> GIT_MINGW="$(dirname "$(git --exec-path)")/../../mingw64"   # => <PortableGit>/mingw64
+> TOKEN=$(printf 'protocol=https\nhost=github.com\n\n' \
+>   | "$GIT_MINGW/bin/git-credential-wincred.exe" get | sed -n 's/^password=//p')
+> ```
+>
+> 返回 `username=<登录名>` / `password=ghp_…`。**先验权限再动手**：
+> `curl.exe -sS -D- -o /dev/null -H "Authorization: token $TOKEN" https://api.github.com/user`
+> 看 **`X-OAuth-Scopes`** 响应头 —— 要能写仓库必须有 `repo`。
+
 ---
 
 ## 8. 不要做什么（反模式）
