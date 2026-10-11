@@ -34,16 +34,17 @@
 **Windows（PowerShell）**
 
 ```powershell
-git clone <本仓库地址> "$env:USERPROFILE\.workbuddy\skills\pm-workflow"
+git clone https://github.com/woyexiangguolikai/pm-workflow.git "$env:USERPROFILE\.workbuddy\skills\pm-workflow"
 ```
 
 **macOS / Linux**
 
 ```bash
-git clone <本仓库地址> ~/.workbuddy/skills/pm-workflow
+git clone https://github.com/woyexiangguolikai/pm-workflow.git ~/.workbuddy/skills/pm-workflow
 ```
 
-没有 git 也行：下载 ZIP，解压后把整个文件夹放到 `~/.workbuddy/skills/pm-workflow/`
+没有 git 也行：在 <https://github.com/woyexiangguolikai/pm-workflow> 点
+`Code → Download ZIP`，解压后把整个文件夹放到 `~/.workbuddy/skills/pm-workflow/`
 （注意别多套一层变成 `pm-workflow/pm-workflow/`）。
 
 **路径不用改** —— 脚本的运行期依赖（Python / Node / Edge）全部自动推导，

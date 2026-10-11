@@ -25,7 +25,7 @@ python scripts/check-publish-safe.py .
 - `clone` 出来直接就是可用形态：
 
 ```powershell
-git clone <repo> "$env:USERPROFILE\.workbuddy\skills\pm-workflow"
+git clone https://github.com/woyexiangguolikai/pm-workflow.git "$env:USERPROFILE\.workbuddy\skills\pm-workflow"
 ```
 
 ```
@@ -327,7 +327,7 @@ git add -A
 git commit -m "chore: 初始提交 —— PM 工作流 v<版本>"
 
 # 在 GitHub / Gitee 建好空仓库后：
-git remote add origin <仓库地址>
+git remote add origin https://github.com/woyexiangguolikai/pm-workflow.git
 git push -u origin main
 git push origin --tags
 ```
@@ -355,8 +355,10 @@ git push origin --tags
 ```powershell
 # 本地
 git rev-parse HEAD^{tree}
-# 远端
-# GET /repos/<owner>/<repo>/git/commits/main  →  读 tree.sha
+
+# 远端（本机 api.github.com 通、github.com 不通，所以用 curl 而不是 git）
+curl.exe -s https://api.github.com/repos/woyexiangguolikai/pm-workflow/git/commits/main
+# 输出里的 "tree":{"sha":"..."} 就是远端 tree
 ```
 
 两个 sha 相同 ⇒ 全部路径 + 全部内容 + 全部文件模式**逐字节一致**，这才是"推成功了"。

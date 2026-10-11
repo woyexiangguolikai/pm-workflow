@@ -120,20 +120,25 @@
 
 ## 检查器清单
 
-| 检查器 | 判据 | 变异测试 | 首次实跑 |
+| 检查器 | 阶段 · 判据 | 变异测试 | 实跑（首轮 → 2026-10-11 收口） |
 |---|---|---|---|
-| `check-requirements.py` | A1–A6 | OK | 3/6 |
-| `check-prd-md.py` | A1–A6 | OK | 4/6 |
-| `check-design-tokens.py` | A1–A5 | OK | 2/5 → 5/5 |
-| `check-library.py` | A1–A8 | OK | **8/8** |
-| `check-prototype.py` | A1–A5 | OK | 4/5 |
-| `check-cards.py` | A1–A6 | OK | 5/6 |
-| `scripts/check-publish-safe.py` | BLOCK / WARN 三级 | OK | **0 BLOCK**（发布前守卫，非阶段判据） |
+| `check-requirements.py` | 01 · A1–A6 | OK | 3/6 → **6/6** |
+| `check-prd-md.py` | 02 · A1–A6 | OK | 4/6（A5/A6 属**已知待补标**，见 02 B4，非新增缺陷） |
+| `check-duplicate-norms.py` | 02 · **A7** 口径副本检测 | OK | **1/1**（定义正文指纹命中 1 处、副本 0） |
+| `check-design-tokens.py` | 03 · A1–A5 | OK | 2/5 → **5/5** |
+| `check-library.py` | 03b · A1–A8 | OK | **8/8** |
+| `check-prototype.py` | 04 · A1–A5 | OK | 4/5 → **5/5** |
+| `check-offline.py` | 04 · **A6** 离线包 `file://` 实测 | OK | **通过**（3 个单文件 / 0 报错 / 23 个锚点全生效 / 3 页可达） |
+| `check-cards.py` | 06 · A1–A6 | OK | 5/6 → **6/6** |
+| `scripts/check-publish-safe.py` | 发布守卫 · BLOCK / WARN 三级 | OK | **0 BLOCK**（非阶段判据） |
+
+> **阶段与检查器的对应**：一个阶段可能有**多个**检查器（02 是 `check-prd-md` + `check-duplicate-norms`；
+> 04 是 `check-prototype` + `check-offline`）。跑阶段时两个都要跑 —— 只跑第一个会漏掉这一阶段的另一半判据。
 
 > **「变异测试 OK」是准入条件，不是加分项。** 每个检查器都要求
 > 「好样本全绿 **且** 坏样本全红」—— 只测好样本等于没测（见 AP-06）。
 >
-> 原有 6 个 + 新增 2 个 = **8 个检查器全部通过变异测试**（2026-10-11 复跑确认）。
+> **8 个阶段检查器 + 1 个发布守卫，全部通过变异测试**（2026-10-11 复跑确认）。
 > 其中 `check-cards.py` / `check-library.py` / `check-requirements.py` / `check-prd-md.py`
 > 的坏样本要求**六项全红**（`failed=['A1'…'A6']`）—— 任何一项漏报都算判别力不足。
 >

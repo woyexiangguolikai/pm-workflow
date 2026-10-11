@@ -68,7 +68,14 @@ PRIORITIES = ("Must", "Should", "Could")
 
 ROW_ID_RE = re.compile(r"^F-([A-Z])-(\d+)$")
 # FR 引用：FR-02 或 FR-13/14 或 FR-13/14/15
-FR_REF_RE = re.compile(r"FR-(\d+)((?:\s*/\s*\d+)*)")
+# 负向后顾 (?<![A-Z]) 是必需的：否则 `NFR-03` 里的 `FR-03` 会被误当成功能需求引用
+FR_REF_RE = re.compile(r"(?<![A-Z])FR-(\d+)((?:\s*/\s*\d+)*)")
+# 非功能需求引用：NFR-02
+NFR_REF_RE = re.compile(r"NFR-(\d+)")
+# 章节引用：§13.4 / §8.2（「§」前缀是硬要求，防止把裸章节号 8.3 放行）
+SEC_REF_RE = re.compile(r"§\s*(\d+(?:\.\d+)*)")
+# 标题里的章节号：`### 8.2 安全（NFR-02）` -> 8.2
+HEADING_NUM_RE = re.compile(r"^#{1,6}\s*(\d+(?:\.\d+)*)")
 BOLD_RE = re.compile(r"\*+|`")
 
 
@@ -76,8 +83,40 @@ def strip_marks(s: str) -> str:
     return BOLD_RE.sub("", s).strip()
 
 
+def classify_cell(cell: str):
+    """把「对应 FR」单元格解析为 [(kind, value)]；形态非法返回 None。
+
+    合法形态**只有四种**（与需求清单「阅读与使用说明」第 5 条一致）：
+      · `FR-xx`   —— 可并写 `FR-13/14`
+      · `NFR-xx`  —— 非功能需求
+      · `§x.y`    —— 非 FR、非 NFR 的正文依据
+      · `—`       —— 无依据（由调用方提前跳过，不进入本函数）
+
+    为什么要做「残留检查」：只判断「能不能解析出东西」会把
+    `FR-01 见 8.2` 这种脏单元格放行 —— 它看着有编号，实际是两种语义糊在一起。
+    因此解析掉全部合法引用后，**余下必须只剩分隔符**。
+    """
+    work = cell
+    refs: list[tuple[str, object]] = []
+    for m in SEC_REF_RE.finditer(work):
+        refs.append(("SEC", m.group(1)))
+    work = SEC_REF_RE.sub(" ", work)
+    for m in NFR_REF_RE.finditer(work):
+        refs.append(("NFR", int(m.group(1))))
+    work = NFR_REF_RE.sub(" ", work)
+    for m in FR_REF_RE.finditer(work):
+        refs.append(("FR", int(m.group(1))))
+        for n in re.findall(r"\d+", m.group(2)):
+            refs.append(("FR", int(n)))
+    work = FR_REF_RE.sub(" ", work)
+    residue = re.sub(r"[\s,、，;；/·|]+", "", work)
+    if residue or not refs:
+        return None
+    return refs
+
+
 def expand_fr(cell: str) -> list[int]:
-    """把 `FR-13/14` 这类引用展开成 [13, 14]。"""
+    """把 `FR-13/14` 这类引用展开成 [13, 14]（保留给旧调用方）。"""
     out: list[int] = []
     for m in FR_REF_RE.finditer(cell):
         out.append(int(m.group(1)))
@@ -88,7 +127,65 @@ def expand_fr(cell: str) -> list[int]:
 
 def collect_prd_fr(prd_text: str) -> set[int]:
     """PRD 中出现过的 FR 编号集合（提及式提取，对悬空引用同样敏感）。"""
-    return {int(n) for n in re.findall(r"FR-(\d+)", prd_text)}
+    return {int(n) for n in re.findall(r"(?<![A-Z])FR-(\d+)", prd_text)}
+
+
+def collect_prd_nfr(prd_text: str) -> set[int]:
+    """PRD 中出现过的 NFR 编号集合。"""
+    return {int(n) for n in re.findall(r"NFR-(\d+)", prd_text)}
+
+
+def collect_prd_sections(prd_text: str) -> set[str]:
+    """PRD 的章节号集合（从标题里取，如 `### 13.4 灰度与回滚` -> '13.4'）。
+
+    只从标题取，不从正文取：正文里「见 5.4」这种提及不能证明章节存在，
+    否则引用错到不存在的章节也会被判合法。
+    """
+    out: set[str] = set()
+    for line in prd_text.split("\n"):
+        m = HEADING_NUM_RE.match(line.strip())
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+# 声明「产品补充清单」的标题（必须是真的 Markdown 标题，普通段落里的提及不算）
+LIST_HEAD_RE = re.compile(r"^#{1,6}\s*[^\n]*产品补充[^\n]*清单")
+# 块内「算作声明」的编号形态：必须**出现在行首**（可带 - / * / | 前缀）
+LEAD_ID_RE = re.compile(r"^\s*(?:[-*+]\s*|\|\s*)?(F-[A-Z]-\d+)")
+
+
+def collect_declared_lists(lines: list[str]) -> list[dict]:
+    """收集「产品补充清单」声明块。
+
+    一个声明块 = 一个匹配 LIST_HEAD_RE 的**标题**，加上其后直到下一个标题为止的行。
+    块内**行首**出现的 `F-x-nn` 即为该声明主张的「无 FR 依据」集合。
+
+    两道收窄都是为了挡住同一种失效 —— 「提及」被读成「声明」：
+
+    1. **限定在标题块内**。文档讨论这件事一定会写下「产品补充」四个字，
+       甚至写出「不属产品补充」这种**否定句**；全文关键词扫描会把否定读成肯定。
+    2. **只认行首编号**。清单表格里，某一行完全可能在说明里顺带提到另一个功能点
+       （实测：F-M-44 的说明写「同 F-M-07」，结果 F-M-07 被判为被声明无依据，
+       而它其实有 FR-22）。行首限制让「引用」与「主张」在形态上就能分开。
+
+    见反例库 AP-06：判据若无法区分这两种形态，假阳性只能靠人忽略，最终判据失效。
+    """
+    out: list[dict] = []
+    i = 0
+    while i < len(lines):
+        if LIST_HEAD_RE.match(lines[i].strip()):
+            block: list[str] = []
+            j = i + 1
+            while j < len(lines) and not lines[j].strip().startswith("#"):
+                block.append(lines[j].strip())
+                j += 1
+            ids = sorted({m.group(1) for l in block if (m := LEAD_ID_RE.match(l))})
+            out.append({"line": i + 1, "ids": ids, "block": block})
+            i = j
+        else:
+            i += 1
+    return out
 
 
 def collect_rows(lines: list[str]) -> list[dict]:
@@ -261,76 +358,82 @@ def analyze(text: str, prd_text: str | None = None) -> dict:
         })
     else:
         prd_fr = collect_prd_fr(prd_text)
+        prd_nfr = collect_prd_nfr(prd_text)
+        prd_sec = collect_prd_sections(prd_text)
         dangling, malformed = [], []
         for r in rows:
             cell = r["fr_cell"]
             if cell in ("", "—", "-"):
                 continue
-            refs = expand_fr(cell)
-            if not refs:
+            refs = classify_cell(cell)
+            if refs is None:
                 malformed.append({"id": r["id"], "line": r["line"], "cell": cell})
                 continue
-            for n in refs:
-                if n not in prd_fr:
-                    dangling.append({"id": r["id"], "line": r["line"], "ref": f"FR-{n:02d}"})
+            for kind, val in refs:
+                if kind == "FR" and val not in prd_fr:
+                    dangling.append({"id": r["id"], "line": r["line"], "ref": f"FR-{val:02d}"})
+                elif kind == "NFR" and val not in prd_nfr:
+                    dangling.append({"id": r["id"], "line": r["line"], "ref": f"NFR-{val:02d}"})
+                elif kind == "SEC" and val not in prd_sec:
+                    dangling.append({"id": r["id"], "line": r["line"], "ref": f"§{val}"})
         checks.append({
             "id": "A5",
             "title": "对应 FR 在 PRD 中存在且形态合法",
             "status": "fail" if (dangling or malformed) else "pass",
             "evidence": {
                 "prdFrCount": len(prd_fr),
+                "prdNfrCount": len(prd_nfr),
+                "prdSectionCount": len(prd_sec),
                 "dangling": dangling,
                 "malformed": malformed,
             },
         })
 
-    # ---------- A6 例外清单自洽（文档自己声明的「无依据」清单必须被明细行支持） ----------
-    EXC_HEAD_RE = re.compile(r"(产品补充|无\s*FR\s*依据|无需求依据)")
-    declared_lists: list[dict] = []
-    for i, line in enumerate(lines, start=1):
-        if not EXC_HEAD_RE.search(line):
-            continue
-        ids = re.findall(r"F-[A-Z]-\d+", line)
-        if ids:
-            declared_lists.append({"line": i, "ids": sorted(set(ids))})
-
-    if not declared_lists:
+    # ---------- A6 例外清单自洽 ----------
+    # 旧实现把「全文档任何提到『产品补充』且带编号的行」都当成声明 —— 结果
+    # 任何讨论该主题的散文（甚至「不属产品补充」这种**否定句**）都会被读成声明，
+    # 产生无法消除的假阳性。判据必须能自己区分「声明」和「提及」，
+    # 因此声明处**限定为以标题形式开出的清单块**，块内直到下一个标题为止。
+    declared = collect_declared_lists(lines)
+    if not declared:
         checks.append({
             "id": "A6", "title": "例外清单与明细行一致",
             "status": "skip",
-            "evidence": {"reason": "文档未声明「产品补充 / 无 FR 依据」清单"},
+            "evidence": {"reason": "文档未以标题形式声明「产品补充功能点清单」；"
+                                  "未声明不等于通过，也不等于失败，故跳过"},
         })
     else:
         detail = {r["id"]: r for r in rows}
-        unsupported, unknown = [], []
-        for lst in declared_lists:
-            for cid in lst["ids"]:
-                r = detail.get(cid)
-                if r is None:
-                    unknown.append({"id": cid, "line": lst["line"]})
-                elif r["fr_cell"] not in ("", "—", "-"):
-                    unsupported.append({
-                        "id": cid, "line": r["line"], "declaredAt": lst["line"],
-                        "fr": r["fr_cell"],
-                    })
-        sets = [set(l["ids"]) for l in declared_lists]
-        inconsistent = []
-        if len(sets) > 1:
-            union = set().union(*sets)
-            for cid in sorted(union):
-                holders = [l["line"] for l in declared_lists if cid in l["ids"]]
-                if len(holders) != len(declared_lists):
-                    inconsistent.append({"id": cid, "declaredAt": holders,
-                                         "missingFrom": [l["line"] for l in declared_lists
-                                                         if cid not in l["ids"]]})
-        bad_a6 = bool(unsupported or unknown or inconsistent)
+        all_ids = set(detail)
+        actual = {r["id"] for r in rows if r["fr_cell"] in ("", "—", "-")}
+        declared_ids = set(declared[0]["ids"]) if len(declared) == 1 else set()
+
+        # 声明处不唯一 —— 这本身就是缺陷（同一事实两处声明必然漂移）
+        dup_decl = [{"line": l["line"]} for l in declared[1:]] if len(declared) > 1 else []
+
+        unknown = sorted(declared_ids - all_ids)          # 声明了不存在的功能点编号
+        has_fr = sorted(cid for cid in declared_ids
+                        if cid in detail and detail[cid]["fr_cell"] not in ("", "—", "-"))
+        missing = sorted(actual - declared_ids)           # 明细行为 — 却没被声明
+
+        bad = bool(dup_decl or unknown or has_fr or missing)
         checks.append({
             "id": "A6", "title": "例外清单与明细行一致",
-            "status": "fail" if bad_a6 else "pass",
-            "evidence": {"lists": declared_lists,
-                         "unsupported": unsupported,
-                         "unknown": unknown,
-                         "inconsistent": inconsistent},
+            "status": "fail" if bad else "pass",
+            "evidence": {
+                "declaredAt": declared[0]["line"],
+                "declaredCount": len(declared_ids),
+                "actualCount": len(actual),
+                "duplicateDeclarations": dup_decl,
+                "unknown": unknown,
+                "declaredButHasFR": [
+                    {"id": cid, "line": detail[cid]["line"], "fr": detail[cid]["fr_cell"]}
+                    for cid in has_fr
+                ],
+                "dashButNotDeclared": [
+                    {"id": cid, "line": detail[cid]["line"]} for cid in missing
+                ],
+            },
         })
 
     failed = [c["id"] for c in checks if c["status"] == "fail"]
@@ -353,6 +456,12 @@ GOOD_PRD = """
 | FR-03 | 系统**必须**支持登录 | 略 | 略 |
 | FR-04 | 系统**必须**支持客服登录 | 略 | 略 |
 | FR-05 | 系统**必须**支持订阅消息 | 略 | 略 |
+
+## 八、非功能需求
+### 8.2 安全（`NFR-02`）
+
+## 十三、上线计划
+### 13.4 灰度与回滚
 """
 
 GOOD = """
@@ -360,8 +469,8 @@ GOOD = """
 | 端 | 页面数 | 功能点数 | Must | Should | Could |
 |---|---|---|---|---|---|
 | 用户端小程序 | 2 | 5 | 5 | 0 | 0 |
-| 平台客服工作台（Web） | 1 | 1 | 1 | 0 | 0 |
-| **合计** | **3** | **6** | **6** | **0** | **0** |
+| 平台客服工作台（Web） | 1 | 3 | 3 | 0 | 0 |
+| **合计** | **3** | **8** | **8** | **0** | **0** |
 
 ## 二、用户端小程序（F-U）
 | 编号 | 功能点 | 说明 / 规则要点 | 优先级 | 对应 FR | 设计状态 |
@@ -376,6 +485,12 @@ GOOD = """
 | 编号 | 功能点 | 说明 / 规则要点 | 优先级 | 对应 FR | 设计状态 |
 |---|---|---|---|---|---|
 | F-C-01 | 账号登录与身份校验 | 略 | Must | FR-04 | 待设计 |
+| F-C-02 | 用户信息脱敏查看 | 略 | Must | NFR-02 | 待设计 |
+| F-C-03 | 看板按校区下钻 | 略 | Must | §13.4 | 待设计 |
+
+### 产品补充功能点清单（=「对应 FR」列为 `—` 的全部行）
+
+- F-U-04
 """
 
 BAD = """
@@ -395,7 +510,10 @@ BAD = """
 | F-U-05 | 订阅消息引导 | 略 | Should | 8.2 | 待设计 |
 | F-C-01 | 客服登录 | 略 | Must | FR-04 | 待设计 |
 
-**产品补充功能点清单**：F-U-03、F-U-05。
+### 产品补充功能点清单
+
+- F-U-03
+- F-U-05
 """
 
 
@@ -480,16 +598,20 @@ def main() -> int:
             for v in ev["dangling"]:
                 print(f"         第 {v['line']} 行 {v['id']}: {v['ref']} 在 PRD 中不存在")
             for v in ev["malformed"]:
-                print(f"         第 {v['line']} 行 {v['id']}: {v['cell']!r} 不是合法 FR 引用")
+                print(f"         第 {v['line']} 行 {v['id']}: {v['cell']!r} 不是合法引用"
+                      f"（只接受 FR-xx / NFR-xx / §x.y / —）")
         elif c["id"] == "A6":
-            for v in ev["unsupported"]:
-                print(f"         第 {v['line']} 行 {v['id']}: 第 {v['declaredAt']} 行声明为"
-                      f"「无 FR 依据」，但明细行填了 {v['fr']}")
+            for v in ev["duplicateDeclarations"]:
+                print(f"         第 {v['line']} 行又开了一处「产品补充清单」标题 —— "
+                      f"同一事实两处声明必然漂移，只允许一处（第 {ev['declaredAt']} 行）")
             for v in ev["unknown"]:
-                print(f"         第 {v['line']} 行声明了 {v['id']}，但无此功能点")
-            for v in ev["inconsistent"]:
-                print(f"         {v['id']}: 出现在第 {v['declaredAt']} 行，"
-                      f"未出现在第 {v['missingFrom']} 行（两份清单不一致）")
+                print(f"         第 {ev['declaredAt']} 行声明了 {v}，但全文无此功能点")
+            for v in ev["declaredButHasFR"]:
+                print(f"         第 {v['line']} 行 {v['id']}: 被声明为「无 FR 依据」，"
+                      f"但明细行填了 {v['fr']}")
+            for v in ev["dashButNotDeclared"]:
+                print(f"         第 {v['line']} 行 {v['id']}: 明细行为「—」却没进清单"
+                      f"（清单共 {ev['declaredCount']} 个，明细行实有 {ev['actualCount']} 个）")
 
     if args.json_out:
         out = Path(args.json_out)

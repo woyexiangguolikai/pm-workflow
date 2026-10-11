@@ -182,7 +182,17 @@ def analyze(root: Path, upstream: set | None = None) -> dict:
                 no_landing.append({"no": h["no"], "ref": raw, "file": h["file"],
                                    "missing": missing, "text": h["text"][:28]})
 
-        bad_a5 = bool(no_ref or not_in_proto or not_upstream)
+        # ★ 失败集只收三类「真缺陷」：
+        #   no_ref      —— 根本没写落点（沉默不等于确认）
+        #   not_upstream—— 落点页面在上游页面地图里也不存在（真悬空）
+        #   no_landing  —— 该条约束的全部落点都不在本原型内（本原型里无从指认）
+        # not_in_proto（上游有、本原型未实现）**不再是失败**，只作告知。
+        # 理由：`const HARD` 是**项目级**硬约束登记表，不是「本原型 23 页」的目录。
+        # 实测反例：约束 #8（完成事件二次确认）的落点含 M-15 扫码核销页 —— 该页是
+        # 交互说明书列明的**三个完成事件触发页之一**，只是属简设页、不在本原型里。
+        # 若按「落点必须在原型内」判失败，整改动作会是「把 M-15 从落点里删掉」，
+        # 而正确的动作恰恰相反（该页必须遵守这条约束）。**结论不准确，整改就会做错。**
+        bad_a5 = bool(no_ref or not_upstream or no_landing)
         checks.append({
             "id": "A5", "title": "硬约束落点可指认",
             "status": "fail" if bad_a5 else "pass",
@@ -219,6 +229,7 @@ window.CS_SCREENS = [
 const HARD = [
   ["1", "某硬约束有落点", "U-02"],
   ["2", "另一约束作用于全部页面", "全部"],
+  ["3", "原型内一个落点 + 上游有而本原型无的简设页落点", "U-02 / M-07"],
 ];
 """
 
@@ -236,6 +247,7 @@ window.RC_SCREENS = [
 window.OA_SCREENS = [];
 const HARD = [
   ["1", "某硬约束落到了不存在的页面", "U-77"],
+  ["2", "某约束的全部落点都在原型外", "M-07"],
 ];
 const bad = <a href="/x"><a href="/y">双链</a></a>;
 const bad2 = <span><div>块级进 span</div></span>;
@@ -345,8 +357,12 @@ def main() -> int:
                 for o in ev["notInUpstream"]:
                     print(f"         #{o['no']} 落点 {o['page']} 上游不存在（真悬空）：{o['text']}")
                 for o in ev["notInPrototype"]:
-                    print(f"         #{o['no']} 落点 {o['page']} 上游有、本原型未实现"
-                          f"（仍有其他落点）：{o['text']}")
+                    print(f"         · #{o['no']} 落点 {o['page']} 属上游简设页、不在本原型内"
+                          f"（告知，不计缺陷 —— 该页仍受此约束）：{o['text']}")
+                if ev["notInPrototype"]:
+                    print(f"         （以上 {len(ev['notInPrototype'])} 条为覆盖范围告知："
+                          f"`const HARD` 是项目级约束表，落点可含本原型未实现的简设页；"
+                          f"只要每条约束还有**至少一个**原型内落点即可）")
 
     if args.json_out:
         out = Path(args.json_out)
