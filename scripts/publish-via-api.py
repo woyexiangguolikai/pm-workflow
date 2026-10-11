@@ -333,7 +333,9 @@ def publish(cli: Client, dry_run: bool, make_tag: bool) -> int:
     # 规则 1：字节取自 git 对象库，不读工作区。
     entries = []
     for p in sorted(dels):
-        entries.append({"path": p, "sha": None})
+        # 删除写法：sha 为 null，但 **mode / type 仍必须给** ——
+        # 只给 {"path","sha":null} 会被 API 拒（422 Must supply a valid tree.mode）。
+        entries.append({"path": p, "mode": "100644", "type": "blob", "sha": None})
         print("  删除           %s" % p)
     for p in sorted(adds):
         raw = git("cat-file", "blob", "HEAD:" + p, binary=True)
