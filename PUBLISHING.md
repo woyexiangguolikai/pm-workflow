@@ -364,7 +364,14 @@ git push origin --tags
 | 造 tree | `POST /git/trees`，`base_tree` 传上一次的 tree，就只需提交**变化的条目**；`path` 可以直接写带 `/` 的完整路径，会自动建子树 |
 | 挪 ref | 默认分支**删不掉**（`422 Cannot delete the default branch`），只能 `PATCH /git/refs/heads/main` 带 `force: true` |
 
-**唯一的验收方式：比 tree sha。**
+**唯一的验收方式：比 tree sha**（`--verify` 会在此基础上再出逐路径差集）。
+
+```powershell
+# 一条命令做完（推荐）：比 tree sha + 逐路径差集，数量全部现算
+python scripts\publish-via-api.py --verify
+```
+
+手工等价做法：
 
 ```powershell
 # 本地
@@ -420,6 +427,8 @@ curl.exe -s https://api.github.com/repos/woyexiangguolikai/pm-workflow/git/commi
 | 漏掉 `.gitattributes` | 别人 clone 到 macOS / Linux 会拿到 CRLF，`.sh` 直接跑不起来 |
 | **走 API 推送时读「工作区字节」** | 工作区可能是 CRLF（或任何未 norm 的形态），git 里存的才是标准形态。**后果是远端每个文件都多一个 `\r`，而你只看 GitHub 网页完全看不出来**。必须取 `git cat-file blob <sha>` 的字节 |
 | **推完只对比「文件数量」就宣布成功** | 数量对不代表字节对。要比 **tree sha**（见 §7 的核对方式）——它是对全部路径 + 全部内容 + 全部模式的密码学摘要 |
+| **在验证脚本里写死「外部状态」的常量**（文件数、tree sha、tag 列表…） | 状态一变就**静默过期**，而脚本里的「通过」字样看起来仍然正常。**数量一律现算。** 已踩到两次：写死的 tree sha（拿旧树比新提交，报出 13 处误报）、写死的「75 个路径」（实际 76） |
+| **修完一处就收工，不问「同一形态还有几处」** | 上面那条规则第一次写下时只改了「树 sha」一个位置，同一个文件里的第二处常量留了下来、几个月后才以另一种形式复现。**修完一处要顺手问：同一形态还有几处** |
 
 ---
 

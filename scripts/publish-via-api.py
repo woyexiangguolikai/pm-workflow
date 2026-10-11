@@ -32,6 +32,7 @@
 用法：
     python scripts/publish-via-api.py              # 发布当前 HEAD 并打标签
     python scripts/publish-via-api.py --dry-run    # 只算不推
+    python scripts/publish-via-api.py --verify     # 只验收：逐路径比对远端 main 与本地 HEAD
     python scripts/publish-via-api.py --no-tag     # 不打标签
 
 凭据（按顺序尝试）：
@@ -196,6 +197,63 @@ def parse_slug(remote_url: str) -> str:
     return "%s/%s" % (m.group(1), m.group(2))
 
 
+# ──────────────────────────── 验收：逐路径比对 ────────────────────────────
+
+def local_entries(ref: str = "HEAD") -> dict[str, tuple[str, str]]:
+    """本地 git 对象库里的 <路径> -> (mode, blob sha)。"""
+    out = {}
+    for line in git("ls-tree", "-r", "-z", ref).split("\0"):
+        if not line:
+            continue
+        meta, path = line.split("\t", 1)
+        mode, _typ, sha = meta.split(" ")
+        out[path] = (mode, sha)
+    return out
+
+
+def remote_entries(cli: Client, tree_sha: str) -> dict[str, tuple[str, str]]:
+    """远端某个 tree 下的 <路径> -> (mode, blob sha)。"""
+    res = cli.call("GET", "/repos/%s/git/trees/%s?recursive=1" % (cli.slug, tree_sha))
+    if res.get("truncated"):
+        # 截断的树**不能用来验收** —— 少算的部分会被当成「远端没有」，
+        # 于是「不一致」和「查不全」在结论上分不出来。
+        raise Fail("远端 tree 被截断（truncated=true），无法逐路径验收 —— 不能拿它下结论。")
+    return {e["path"]: (str(e["mode"]), e["sha"])
+            for e in res.get("tree", []) if e["type"] == "blob"}
+
+
+def compare(cli: Client) -> bool:
+    """远端 main 与本地 HEAD 逐路径比对。**数量全部现算，不写死任何常量。**"""
+    local_head = gittext("rev-parse", "HEAD")
+    local_tree = gittext("rev-parse", "HEAD^{tree}")
+    remote = cli.call("GET", "/repos/%s/commits/main" % cli.slug)
+    remote_sha, remote_tree = remote["sha"], remote["commit"]["tree"]["sha"]
+
+    print("远端 main   = %s" % remote_sha)
+    print("本地 HEAD   = %s%s" % (local_head, "" if remote_sha == local_head else "   ← 两边不是同一个提交"))
+    print("远端 tree   = %s" % remote_tree)
+    print("本地 tree   = %s%s" % (local_tree, "" if remote_tree == local_tree else "   ← tree 不同"))
+
+    L, R = local_entries(), remote_entries(cli, remote_tree)
+    only_remote = sorted(set(R) - set(L))
+    only_local = sorted(set(L) - set(R))
+    mismatched = sorted(p for p in (set(L) & set(R)) if L[p] != R[p])
+
+    print("\n本地 blob 数 = %d" % len(L))
+    print("远端 blob 数 = %d" % len(R))
+    print("只在远端有   = %s" % (only_remote or "无"))
+    print("只在本地有   = %s" % (only_local or "无"))
+    print("sha/mode 不同 = %s" % (mismatched or "无"))
+
+    ok = not (only_remote or only_local or mismatched)
+    print("\n%s %d 个路径%s" % ("✅" if ok else "❌", len(L),
+                                "全部逐字节一致" if ok else "未能全部对上"))
+    if not ok:
+        for p in mismatched[:20]:
+            print("   %s  本地 %s / 远端 %s" % (p, L[p], R[p]))
+    return ok
+
+
 # ──────────────────────────── 发布 ────────────────────────────
 
 def ident_to_iso(line: str) -> tuple[str, str, str]:
@@ -290,14 +348,10 @@ def publish(cli: Client, dry_run: bool, make_tag: bool) -> int:
     cli.call("PATCH", "/repos/%s/git/refs/heads/main" % cli.slug, {"sha": commit["sha"], "force": True})
     print("ref main 已更新")
 
-    # ── 验收：唯一的证据 ──
-    after = cli.call("GET", "/repos/%s/commits/main" % cli.slug)["commit"]["tree"]["sha"]
-    ok = after == local_tree
-    print("\n验收：远端 tree = %s" % after)
-    print("      本地 tree = %s" % local_tree)
-    print("      结论 = %s" % ("✅ 一致（逐字节相同）" if ok else "❌ 不一致"))
-    if not ok:
-        raise Fail("远端 tree 与本地不一致 —— 这次发布不算成功。")
+    # ── 验收：唯一的证据（tree sha + 逐路径） ──
+    print("\n验收：")
+    if not compare(cli):
+        raise Fail("远端与本地不一致 —— 这次发布不算成功。")
 
     if make_tag:
         skill_md = (REPO_DIR / "SKILL.md").read_text(encoding="utf-8")
@@ -316,6 +370,8 @@ def publish(cli: Client, dry_run: bool, make_tag: bool) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description="通过 Git Data API 发布本仓库（git push 不通时用）")
     ap.add_argument("--dry-run", action="store_true", help="只计算与打印，不改远端")
+    ap.add_argument("--verify", action="store_true",
+                    help="只做验收：逐路径比对远端 main 与本地 HEAD，不发布")
     ap.add_argument("--no-tag", action="store_true", help="不打标签")
     ap.add_argument("--helper", default=None, help="git credential helper 的可执行文件路径")
     ap.add_argument("--repo-url", default=None, help="覆盖 origin（默认读 git remote get-url origin）")
@@ -336,7 +392,10 @@ def main() -> int:
     print("凭据   = %s" % src)
     print("目标   = main（本脚本不发别的分支）\n")
 
-    return publish(Client(token, slug), args.dry_run, not args.no_tag)
+    cli = Client(token, slug)
+    if args.verify:
+        return 0 if compare(cli) else 1
+    return publish(cli, args.dry_run, not args.no_tag)
 
 
 if __name__ == "__main__":
