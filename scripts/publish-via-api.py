@@ -405,7 +405,22 @@ def publish(cli: Client, dry_run: bool, make_tag: bool,
             tag = "v" + m.group(1)
             res = cli.call("POST", "/repos/%s/git/refs" % cli.slug,
                            {"ref": "refs/tags/" + tag, "sha": commit["sha"]})
-            print("\n标签 %s %s" % (tag, "已存在，跳过" if res.get("_already_exists") else "已创建"))
+            if res.get("_already_exists"):
+                # 🔴 tag 已存在 ≠ 指向正确。**补提交之后 tag 会落后于 main**，
+                #    而 tag 是「这一版发布在哪」的锚 —— 落后就意味着
+                #    按 tag 取到的代码不是这一版的最终形态。
+                #    所以这里不是「跳过」，而是**核对指向**，不一致就重指。
+                old = cli.call("GET", "/repos/%s/git/ref/tags/%s" % (cli.slug, tag))
+                old_sha = (old or {}).get("object", {}).get("sha")
+                if old_sha == commit["sha"]:
+                    print("\n标签 %s 已存在且指向正确" % tag)
+                else:
+                    print("\n标签 %s 已存在但指向 %s（应为 %s）—— 重新指向"
+                          % (tag, (old_sha or "?")[:8], commit["sha"][:8]))
+                    cli.call("PATCH", "/repos/%s/git/refs/tags/%s" % (cli.slug, tag),
+                             {"sha": commit["sha"], "force": True})
+            else:
+                print("\n标签 %s 已创建" % tag)
             if make_release_flag:
                 make_release(cli, tag)
             else:
@@ -431,10 +446,16 @@ def make_release(cli: "Client", tag: str, changelog: Path | None = None) -> None
         print("  ⚠ 找不到 %s，跳过 Release。" % changelog.name)
         return
     text = changelog.read_text(encoding="utf-8")
-    m = re.search(r"## \[%s\][^\n]*\n(.*?)(?=\n## \[|\Z)" % re.escape(tag), text, re.S)
+    # CHANGELOG 的段头是 `## [1.3.0]`，tag 是 `v1.3.0` —— 两者差一个 `v` 前缀。
+    # 早先只按 tag 精确匹配，于是永远找不到段落，Release 静默跳过。
+    # 判据改成**剥掉可选的 v 前缀后比对**，并且找不到时把 CHANGELOG 里现有的段头列出来 ——
+    # 静默跳过是最坏的处理方式：看起来成功了，实际没建。
+    ver = re.sub(r"^v", "", tag)
+    m = re.search(r"## \[%s\][^\n]*\n(.*?)(?=\n## \[|\Z)" % re.escape(ver), text, re.S)
     if not m:
-        print("  ⚠ CHANGELOG 里没有 [%s] 段，跳过 Release。" % tag)
-        return
+        heads = re.findall(r"^## \[([^\]]+)\]", text, re.M)[:8]
+        raise Fail("CHANGELOG.md 里没有 [%s] 段 —— Release 正文只能逐条书写，不另维护一份。\n"
+                   "      CHANGELOG 现有段头：%s" % (ver, "、".join(heads) or "（无）"))
     body = m.group(0).strip()
     # 把仓库内相对链接换成绝对 URL
     body = re.sub(r"\]\((?!https?://)([^)]+)\)",
