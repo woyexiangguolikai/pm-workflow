@@ -209,6 +209,39 @@ wb-publish-scan: ignore-file
 
 **验证方式**：`git ls-files --eol <文件>` 应显示 `i/lf w/lf`（索引与工作区都是 LF）。
 
+### 5b-1. 仓库内必须关掉 `core.autocrlf`（会和 `.gitattributes` 打架）
+
+`.gitattributes` 一旦接管行尾，`core.autocrlf=true` 就成了**第二套互相矛盾的政策**。
+两者同时存在时会进入一个很费时间的迷惑状态：
+
+| 现象 | 说明 |
+| --- | --- |
+| `git status` 说十几个文件被改了 | 看上去像有未提交改动 |
+| `git diff` **完全是空的** | 同一个文件，两个命令结论相反 |
+| `git update-index --refresh` 报 `needs update` | 刷不掉，越刷越可疑 |
+| `git ls-files --eol` 一堆 `w/crlf` | 这才是真正的线索 |
+
+**一条命令解决**（只动本仓库，不碰你的全局偏好）：
+
+```powershell
+git -C "$env:USERPROFILE\.workbuddy\skills\pm-workflow" config --local core.autocrlf false
+git -C "$env:USERPROFILE\.workbuddy\skills\pm-workflow" add --renormalize .
+```
+
+**为什么只改 `--local`**：`core.autocrlf` 是用户级偏好，别的仓库还要用；
+本仓库的行尾政策已经写在 `.gitattributes` 里，由它单独负责就够了。
+
+`add --renormalize` 会重写索引。执行前先记下 tree，执行后必须一模一样：
+
+```powershell
+git rev-parse HEAD^{tree}     # 刷新前
+git add --renormalize .
+git write-tree                # 刷新后，必须与前一行相同
+```
+
+tree 不变 ⇒ 这次重写是纯粹的 stat 缓存刷新，没有任何内容变化，**远端不需要重推**。
+tree 变了 ⇒ 说明真的动了内容，要停下来查清楚，不能直接推。
+
 ---
 
 ## 6. 素材库的许可约束（**贡献者最容易踩的**）
@@ -251,7 +284,7 @@ bsd-2-clause · bsd-3-clause · cc-by-4.0 · cc-by-3.0
 
 ```yaml
 metadata:
-  ai.workbuddy.version: 1.1.0
+  ai.workbuddy.version: <x.y.z>   # 与 CHANGELOG 段头、git tag 三处一致
 ```
 
 **同步动作**（改版本号时三处一起动）：
@@ -280,7 +313,7 @@ git add -A
 git commit -m "feat(03b): 素材库改为跨项目累积形态"
 
 # 5) 打标签并推送
-git tag v1.1.0
+git tag v<版本>          # 与 SKILL.md、CHANGELOG 一致
 git push origin main --tags
 ```
 
@@ -291,7 +324,7 @@ cd "$env:USERPROFILE\.workbuddy\skills\pm-workflow"
 
 git init -b main
 git add -A
-git commit -m "chore: 初始提交 —— PM 工作流 v1.1.0"
+git commit -m "chore: 初始提交 —— PM 工作流 v<版本>"
 
 # 在 GitHub / Gitee 建好空仓库后：
 git remote add origin <仓库地址>
@@ -302,6 +335,41 @@ git push origin --tags
 > ⚠️ **`git init` 之前先确认 `.gitignore` 已存在**。否则第一次 `git add -A`
 > 会把 `feedback/review/`、`library/local/` 一起加进索引 ——
 > 之后**即使补上 `.gitignore`，已进索引的文件仍会继续被跟踪**（需要 `git rm --cached`）。
+
+### 7-1. 兜底路径：`git push` 不通时走 API
+
+有些网络环境会**只放通 `api.github.com`、挡掉 `github.com:443`**
+（典型症状：`curl https://github.com` 报 `502 CONNECT tunnel failed`，
+而 `https://api.github.com/user` 返回 200）。此时 `git push` 用不了，
+只能走 Git Data API。四条硬规则：
+
+| 步骤 | 要点 |
+| --- | --- |
+| 建仓 | 空仓库上**建不了对象**（API 报 `409 Git Repository is empty`）。先用 Contents API `PUT /contents/.seed-placeholder` 塞一个占位文件 |
+| 造 blob | 🔴 **字节取自 `git cat-file blob <sha>`，不要打开工作区文件读**。工作区可能是 CRLF，读出来会污染整个远端（见 §8） |
+| 造 tree | `POST /git/trees`，`base_tree` 传上一次的 tree，就只需提交**变化的条目**；`path` 可以直接写带 `/` 的完整路径，会自动建子树 |
+| 挪 ref | 默认分支**删不掉**（`422 Cannot delete the default branch`），只能 `PATCH /git/refs/heads/main` 带 `force: true` |
+
+**唯一的验收方式：比 tree sha。**
+
+```powershell
+# 本地
+git rev-parse HEAD^{tree}
+# 远端
+# GET /repos/<owner>/<repo>/git/commits/main  →  读 tree.sha
+```
+
+两个 sha 相同 ⇒ 全部路径 + 全部内容 + 全部文件模式**逐字节一致**，这才是"推成功了"。
+文件数量相同、网页上看着对，都**不算**证据。
+
+> 📌 **本次真实踩到**：远端 tree 与本地不一致，第一反应是"GitHub 存了 CP1252"——
+> 错的。真正原因是推送脚本读了工作区字节，工作区那 13 个文件是 CRLF、git 里是 LF。
+> **先量，别先猜**：`git ls-files --eol` 一跑就现形。
+
+> 📌 **让两边提交 sha 也一致的做法**：远端提交对象的内容（identity / 时间戳 / 消息）
+> 与本地不同，sha 就对不上。可以 `POST /git/commits` 时**显式传** `author` / `committer`
+> （含 `date`，用 `+08:00` 形式）与**完整消息**，GitHub 会复现出与本地**完全相同**的 sha。
+> 注意消息**不要 `.strip()`** —— 尾换行少一个字节，整个对象就不同了。
 
 ---
 
@@ -319,6 +387,8 @@ git push origin --tags
 | 新增豁免不登记 | 豁免会变成后门。没写在登记表里的豁免**不该存在** |
 | 改 `references/` 后忘记重渲染手册 | 手册与 skill 漂移，别人按手册做会和实际不符 |
 | 漏掉 `.gitattributes` | 别人 clone 到 macOS / Linux 会拿到 CRLF，`.sh` 直接跑不起来 |
+| **走 API 推送时读「工作区字节」** | 工作区可能是 CRLF（或任何未 norm 的形态），git 里存的才是标准形态。**后果是远端每个文件都多一个 `\r`，而你只看 GitHub 网页完全看不出来**。必须取 `git cat-file blob <sha>` 的字节 |
+| **推完只对比「文件数量」就宣布成功** | 数量对不代表字节对。要比 **tree sha**（见 §7 的核对方式）——它是对全部路径 + 全部内容 + 全部模式的密码学摘要 |
 
 ---
 
@@ -331,6 +401,9 @@ git push origin --tags
 [ ] feedback/ 下每个文件都问过「这是判据还是产出？」 → 产出不该在这
 [ ] git check-ignore -v feedback/review/ library/local/ scripts/publish-denylist.txt  → 命中
 [ ] git ls-files --eol <抽一个文件>                  → i/lf w/lf（行尾统一）
+[ ] 仓库内 core.autocrlf 已置 false                  → 否则 status / diff 会互相矛盾（§5b-1）
+[ ] git status --short 为空                          → 若报 M 但 git diff 为空，见 §5b-1
+[ ] 推完比过 tree sha（本地 HEAD^{tree} == 远端 tree.sha）→ 数量相同不算证据
 [ ] SKILL.md 里 name: 只出现一次
 [ ] SKILL.md 版本号 / CHANGELOG / 即将打的 tag 三者一致
 [ ] references/ 改过 → 已重渲染手册

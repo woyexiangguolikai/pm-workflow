@@ -8,6 +8,39 @@
 
 ---
 
+## [1.1.1] — 2026-10-11
+
+> 主题：**发布路径本身的坑位补录**。首次真正推送到远端仓库时踩到的三件事，
+> 全部与「看不出来」有关 —— 网页上一切正常，字节层面是错的。
+
+### Added
+
+- `PUBLISHING.md` §5b-1：`core.autocrlf` 与 `.gitattributes` 冲突的**诊断表与修法**。
+  症状很具迷惑性：`git status` 报十几个文件被改，`git diff` 却是空的。
+- `PUBLISHING.md` §7-1：`git push` 不通时走 Git Data API 的四条硬规则
+  （空仓库建不了对象要先 seed / blob 取 `git cat-file` 而非工作区 / ref 只能 force 不能删）
+  以及 **tree sha 验收法**。
+- `PUBLISHING.md` §8 新增两行反模式、§9 新增三项自检。
+
+### Fixed
+
+- **首次推送读的是工作区字节**：13 个文件工作区是 CRLF、git 里是 LF，
+  推上去后远端每个文件多一个 `\r`，而 GitHub 网页完全看不出来。
+  改为取 `git cat-file blob <sha>` 的字节，推完 blob sha 与本地逐一吻合。
+- 仓库内 `core.autocrlf` 置 `false`。`text=auto eol=lf` 与 `autocrlf=true`
+  是两套互相矛盾的政策，同时存在会让 `git status` 与 `git diff` 结论相反。
+
+### Notes
+
+- **远端验收标准确立为「tree sha 相同」** —— 它是对全部路径 + 内容 + 文件模式的
+  密码学摘要。文件数量相同、网页上看着对，都不算证据。
+- 排除一个错误假设：一度判断「GitHub 用 CP1252 存 blob」，
+  实为 CRLF 未归一。**先量后猜**：`git ls-files --eol` 一跑就现形。
+- 「让远端提交 sha 与本地完全相同」的做法已验证可行：`POST /git/commits` 时显式传
+  `author` / `committer`（含 `date`）与**未 strip 的完整消息**，GitHub 会复现出同一个 sha。
+
+---
+
 ## [1.1.0] — 2026-10-11
 
 > 主题：**从「一次性的编排」变成「可累积、可发布的资产」**。
@@ -152,5 +185,6 @@
 
 ---
 
+[1.1.1]: ../../../releases/tag/v1.1.1
 [1.1.0]: ../../../releases/tag/v1.1.0
 [1.0.0]: ../../../releases/tag/v1.0.0
