@@ -44,7 +44,24 @@ SECRET_PATTERNS = [
     ("私钥块", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
     ("AWS Access Key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("微信/支付宝类长串密钥", re.compile(r"\b(?:sk|pk|ak|api[_-]?key)[_-]?[A-Za-z0-9]{24,}\b", re.I)),
-    ("Bearer/Token 赋值", re.compile(r"(?i)\b(?:authorization|token|secret|password)\s*[:=]\s*[\"'][^\"']{16,}[\"']")),
+    # ⚠️ 引号内**不许跨行**（`[^"'\n]`）—— 真凭据一定是单行字面量；
+    # 允许跨行会让「代码里解析凭据」被误判成「泄露凭据」：
+    #   `if line.startswith("password="):` 之后到下一个引号之间恰好 ≥16 字符 → 假阳性。
+    # 判据的假阳性必须改判据，不能靠人工忽略（被无视一次的判据永久失效）。
+    # ⚠️ 关键词后面允许跟一个**收尾引号**（`["']?`）—— 否则 JSON / YAML 形态
+    #   `{"token": "abcdefghijklmnopqrstuvwxyz123456"}` 一条都抓不到。
+    #   这个盲区曾被变异测试掩盖：坏样本仍报 BLOCK=2，但那 2 条都来自同一个文件，
+    #   凭据那条根本没触发（详见下方 selftest 的逐文件断言）。
+    ("Bearer/Token 赋值", re.compile(
+        r"(?i)\b(?:authorization|token|secret|password|api[_-]?key|access[_-]?key)"
+        r"[\"']?\s*[:=]\s*"
+        # 值不能是「点分标识符」：`'token': 'color.primaryText'` 是设计 token 的映射表，
+        # 不是凭据 —— **凭据里不会出现 `a.b.c` 这种命名结构**。
+        # 只能从值上区分：关键词 `token` 一词两义（设计 token / 鉴权 token），
+        # 把关键词删掉会漏掉最常见的 JSON 泄露形态，所以留在关键词上、筛在值上。
+        # 残余盲区：纯字母数字分段的 JWT 也是点分形态，会漏 —— 但它本来就没被覆盖
+        # （`Authorization: Bearer eyJ...` 不带引号，本条本来也抓不到）。
+        r"[\"'](?![\w]+(?:\.[\w]+)+[\"'])[^\"'\n]{16,}[\"']")),
     ("数据库连接串", re.compile(r"(?i)\b(?:mysql|postgres|mongodb|redis)://[^\s\"']+:[^\s\"']+@")),
 ]
 
@@ -232,6 +249,16 @@ GOOD_DIR = {
     "README.md": "# 一个干净的 skill\n\n路径写成 `~/.workbuddy/skills/`，或用 `$env:USERPROFILE`。\n",
     "SKILL.md": "示例邮箱用 you@example.com，示例密钥用 <YOUR_TOKEN>。\n",
     ".gitignore": "feedback/review/\nlibrary/local/\n",
+    # 「解析凭据的代码」不是「泄露凭据」。这一段固定住那条跨行假阳性：
+    # 若判据又变回 `[^"']{16,}`，这里会立刻报 BLOCK。
+    "cred_helper.py": (
+        "def field(line, key):\n"
+        "    prefix = key + \"=\"\n"
+        "    return line[len(prefix):].strip() if line.startswith(prefix) else \"\"\n\n"
+        "if line.startswith(\"password=\"):\n"
+        "    passwd = line[9:].strip()\n"
+        "    return user, passwd\n"
+    ),
 }
 
 BAD_DIR = {
@@ -272,7 +299,13 @@ def selftest() -> int:
         nodeny = analyze(_write(Path(d) / "nodeny", NO_DENY_DIR))
 
     ok_good = not good["failed"]
-    ok_bad = bool(bad["blocks"])
+    # 🔴 坏样本必须**逐个文件**都命中，不能只要求「有 BLOCK」。
+    # 曾经的坑：BAD_DIR 里植了 3 个缺陷，config.md 一个文件就被两条路径规则各命中一次，
+    #     BLOCK 数 = 2 看起来「够红」，而 creds.json 的凭据**一条规则都没抓到** ——
+    #     变异测试全绿，却从未验证过凭据规则。这就是 AP-06 的假绿。
+    hid = {h["path"].split("/")[-1] for h in bad["blocks"] + bad["warns"]}
+    bad_missed = [f for f in BAD_DIR if f not in hid]
+    ok_bad = not bad_missed
     # 黑名单命中 → 必须 BLOCK，且 kind 要标明是「项目词」
     ok_deny = bool(deny["blocks"]) and any("项目词" in h["kind"] for h in deny["blocks"])
     # 无黑名单 → 不能静默通过：必须报「未扫描」，且不算失败（用户尚未配置）
@@ -283,8 +316,9 @@ def selftest() -> int:
     print("变异测试 —— 证明检查有判别力")
     print(f"  好样本 期望可发布     : {'通过' if ok_good else '失败'}"
           f"  (实得 BLOCK={len(good['blocks'])} WARN={len(good['warns'])})")
-    print(f"  坏样本 期望有 BLOCK   : {'通过' if ok_bad else '失败'}"
-          f"  (实得 BLOCK={len(bad['blocks'])})")
+    print(f"  坏样本 期望逐个命中   : {'通过' if ok_bad else '失败'}"
+          f"  (实得 BLOCK={len(bad['blocks'])} WARN={len(bad['warns'])}"
+          + (f"，**漏掉 {bad_missed}**)" if bad_missed else "，3 个植入缺陷全命中)"))
     print(f"  项目词 期望被 BLOCK   : {'通过' if ok_deny else '失败'}"
           f"  (实得 BLOCK={len(deny['blocks'])})")
     print(f"  无黑名单 期望报「未扫描」: {'通过' if ok_nodeny else '失败'}"

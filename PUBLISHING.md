@@ -315,6 +315,9 @@ git commit -m "feat(03b): 素材库改为跨项目累积形态"
 # 5) 打标签并推送
 git tag v<版本>          # 与 SKILL.md、CHANGELOG 一致
 git push origin main --tags
+
+# 5b) 如果 git push 不通（只放通 api.github.com）—— 走脚本，别手写
+python scripts\publish-via-api.py
 ```
 
 ### 首次建仓
@@ -342,6 +345,17 @@ git push origin --tags
 （典型症状：`curl https://github.com` 报 `502 CONNECT tunnel failed`，
 而 `https://api.github.com/user` 返回 200）。此时 `git push` 用不了，
 只能走 Git Data API。四条硬规则：
+
+> 🔧 **已固化成脚本，不要每次现写**：`scripts/publish-via-api.py`。
+> 下面四条硬规则、凭据获取（含「挂死」与「没配凭据」的区分）、tree sha 验收都在里面：
+>
+> ```powershell
+> python scripts\publish-via-api.py --dry-run   # 先看会发什么
+> python scripts\publish-via-api.py             # 真发，并打标签
+> ```
+>
+> 脚本里没有本机路径：仓库根从脚本位置推导，`owner/repo` 从 `git remote get-url origin` 解析，
+> 换个人 clone 下来照样能用。
 
 | 步骤 | 要点 |
 | --- | --- |

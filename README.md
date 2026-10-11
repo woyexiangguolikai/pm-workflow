@@ -199,6 +199,7 @@ pm-workflow/
     ├── build-manual.py               # 从 references/ 现渲染手册
     ├── check-manual.py               # 手册与 references/ 的漂移检查
     ├── check-publish-safe.py         # 发布前自检：密钥 / PII / 本机路径 / 项目词
+    ├── publish-via-api.py            # git push 不通时按 Git Data API 发布（tree sha 验收）
     ├── md-tables-for-library.py      # 素材库表格渲染
     └── publish-denylist.example.txt  # 项目词黑名单模板（真名单不进库）
 ```
