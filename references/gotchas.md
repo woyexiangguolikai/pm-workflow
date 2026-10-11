@@ -26,8 +26,11 @@ const r = await new Promise(res => {
 
 ### Shell
 
-- **默认 shell = PowerShell 7**（用户明确要求）。但 WorkBuddy 自己的 PowerShell 工具固定在 **Windows PowerShell 5.1**。
-- → **给用户贴的命令要写成 5.1 与 7 都能跑的语法**（5.1 不支持 `&&`、`||`、`?:`、`??`）。
+- **Windows 上以 PowerShell 7 为准。** 本文档所有命令按 **PowerShell 7** 写
+  （`&&`、`||`、`?:`、`??` 都可以用）；macOS / Linux 换成对应的 bash 命令。
+- ⚠️ **不要为了兼容旧版本而降级语法。** 曾把「命令要 5.1 也能跑」当成硬约束写进文档，
+  结果是把**一台机器上的工具限制**变成了**对所有使用者的要求**。
+  **版本下限只该由工作流真正依赖的东西决定。**
 - **没有 Git Bash**。唯一可用的 bash 是 PortableGit：`%USERPROFILE%\.workbuddy\binaries\PortableGit\versions\<ver>\bin\bash.exe`。
   ⚠️ **不要写死用户名** —— 脚本里用 `os.path.expanduser('~')` 或 `$env:USERPROFILE` 推导。
 - 工具里**禁止 `cmd.exe`**（会被安全策略挡掉），要用原生 cmdlet。
@@ -41,7 +44,7 @@ const r = await new Promise(res => {
 | `... \| grep x` | `... \| Select-String x` |
 | `which X` | `Get-Command X` |
 
-⚠️ PS 5.1 没有 `[Convert]::ToHexString`。⚠️ 续行符是反引号，**反引号后不能有空格** → 尽量给一整行。
+⚠️ 续行符是反引号，**反引号后不能有空格** → 尽量把命令写成一整行。
 
 ### 路径
 

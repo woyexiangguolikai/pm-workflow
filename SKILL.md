@@ -2,7 +2,7 @@
 name: pm-workflow
 description: 产品经理全流程工作流：盘点 → 需求 → PRD → 设计规范 → 组件库 → 原型 → 需求卡片画布。每阶段产出「JSON 数据源 + HTML 自包含视图」双格式，单一数据源驱动、脚本自校验 + 变异测试，每阶段末尾闭合质量反馈环路（rubric 自评 + 反例库 + 评审流水）。当用户要写 PRD、做需求规格、定设计规范、建组件库、画高保真原型、做需求卡片、把需求与原型关联、盘点存量系统、或提到「产品经理工作流」「PM 工作流」「需求卡片」「原型画布」时使用。
 metadata:
-  ai.workbuddy.version: 1.1.4
+  ai.workbuddy.version: 1.1.5
   ai.workbuddy.author: llllll
   ai.workbuddy.homepage: ""
 ---
@@ -286,5 +286,5 @@ python <skill>/scripts/build-manual.py --out ./_manual
 - Node：先读 `$env:WB_NODE`，再扫 `~/.workbuddy/binaries/node/versions/` 取最新；`NODE_PATH` 指向 `.../node/workspace/node_modules`（可用 `$env:WB_NODE_MODULES` 覆盖）
 - Edge：`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`（没有则试 `C:\Program Files\...`）
 - ⚠️ **Node 的 `spawnSync`/`execSync` 恒报 `EBUSY`** → 一律用 `spawn` + Promise
-- ⚠️ 没有 Git Bash；PowerShell 5.1 不支持 `&&`
+- ⚠️ Windows 上以 **PowerShell 7** 为准（`&&`、`||` 可用）；本机没有 Git Bash
 - 详见 `references/gotchas.md`

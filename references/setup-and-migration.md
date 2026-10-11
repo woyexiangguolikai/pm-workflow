@@ -30,7 +30,7 @@ description: 把 PM 工作流搬到另一台电脑上使用（打包 / 放置 / 
 
 ## 1. 在本机打包
 
-PowerShell 5.1 与 7 都能跑：
+在 PowerShell 7 里跑：
 
 ```powershell
 $src = "$env:USERPROFILE\.workbuddy\skills\pm-workflow"

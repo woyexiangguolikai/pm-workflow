@@ -46,7 +46,7 @@ const PORT = 9333 + (process.pid % 500);   // 端口要跟 pid 走，防撞车
 ```
 
 ```powershell
-# 跑 Node 脚本时（PowerShell 5.1 / 7 都能跑）
+# 跑 Node 脚本时（PowerShell 7）
 $env:NODE_PATH = "$env:USERPROFILE\.workbuddy\binaries\node\workspace\node_modules"
 ```
 
