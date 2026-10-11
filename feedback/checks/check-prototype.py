@@ -14,6 +14,9 @@
     A2  离线包本地引用可达：href / src 中的本地相对路径目标必须存在
     A3  页面数与声明一致，且各处声明自洽
     A4  五端齐备：5 个端注册表，每端至少 1 页
+    A5  硬约束落点可指认（原 B2 升级为 A 类）
+    A7  页面集合与线框图一致（原 B1 升级为 A 类）
+        （A6「离线包真可用」在 check-offline.py —— 一个阶段可以对应多个检查器）
 
 退出码: 0 = 全部通过; 1 = 存在失败项; 2 = 运行错误
 
@@ -44,6 +47,9 @@ HARD_ROW_RE = re.compile(
 # 页面编号：先屏蔽 F-X-nn（其尾缀形如 U-01，会假命中），再用负向后顾
 MASK_CARD_RE = re.compile(r"F-[A-Z]-\d+")
 PROTO_PAGE_RE = re.compile(r"(?<![A-Za-z0-9-])([UMROC]-\d{2})(?!\d)")
+# A7：线框图的页面编号写在 `<span class="code">XX-NN</span>` 里（实测：恰好 23 个、五端齐备）。
+# 两侧编号都是机械可读的 → 「页面集合是否与线框一致」没有理由推给人（原 B1）。
+WF_CODE_RE = re.compile(r'class="code"[^>]*>\s*([A-Z]-\d{2})\s*<')
 WILDCARD_REF = ("全部", "全端", "所有端", "—", "-")# `(?:(?!/>)[^>])*` 只吃「不含 >、且不以 /> 收尾」的字符，从而跳过自闭合标签。
 # 首版没排除自闭合，把 <span ... /> 后面的兄弟 <div> 当成了子节点 —— 5 处全是假阳性。
 NEST_A_RE = re.compile(r"<a\b(?:(?!/>)[^>])*>((?:(?!</a>).)*?)<a\b", re.S)
@@ -53,7 +59,30 @@ ATTR_RE = re.compile(r'\b(?:href|src)\s*=\s*"([^"]+)"')
 EXTERNAL_PREFIX = ("http://", "https://", "//", "#", "mailto:", "data:", "javascript:")
 
 
-def analyze(root: Path, upstream: set | None = None) -> dict:
+def find_wireframe(root: Path, explicit: str | None) -> Path | None:
+    """定位线框图。显式指定优先；否则向**上**逐级找（原型通常在 <项目>/designs/<项目>/）。
+
+    为什么必须「向上找」而不是只认一个固定路径：线框图属**结构层**产物、落在项目根，
+    而原型在 `designs/<项目>/`。写死相对路径会在别的项目上静默找不到 ——
+    而「找不到」必须表现为**失败**，不能表现为「无事通过」（AP-04：沉默不等于确认）。
+    """
+    if explicit:
+        p = Path(explicit)
+        return p if p.exists() else None
+    base = root
+    for _ in range(4):
+        if base.exists():
+            hits = sorted(base.glob("*线框图*.html"))
+            if hits:
+                return hits[0]
+        if base.parent == base:
+            break
+        base = base.parent
+    return None
+
+
+def analyze(root: Path, upstream: set | None = None,
+            wireframe: str | None = None) -> dict:
     src = root / "src"
     offline = root / "离线版"
     jsx_files = sorted(src.glob("*.jsx")) if src.exists() else []
@@ -203,6 +232,45 @@ def analyze(root: Path, upstream: set | None = None) -> dict:
                          "notInUpstream": not_upstream, "noLanding": no_landing},
         })
 
+    # ---------- A7 页面集合与线框图一致（原 B1 升级为 A 类） ----------
+    # 判据来源：B1「结构对齐线框：页面集合与线框图一致，未新增页面」。
+    # 原型侧取 `<端>_SCREENS` 的 code，线框侧取 `<span class="code">` —— 两侧都机械可读，
+    # 所以这件事**可判**；可判就不该推给人（元规则 1：判不了的只是口号）。
+    wf_path = find_wireframe(root, wireframe)
+    if wf_path is None:
+        checks.append({
+            "id": "A7", "title": "页面集合与线框图一致",
+            "status": "fail",
+            "evidence": {"reason": "未找到线框图（可用 --wireframe 指定）。"
+                                   "**样本为 0 判失败**，不是「无事通过」——"
+                                   "「没能证明新增了页面」不等于「已经证明没有新增」。"},
+        })
+    else:
+        wf_txt = wf_path.read_text(encoding="utf-8", errors="ignore")
+        wf_pages = set(WF_CODE_RE.findall(wf_txt))
+        if not wf_pages:
+            # ★ 控制项：格式变了必须**失败**。否则「两侧都空」会让 A7 退化成恒真命题 ——
+            #   这与 A6-4「基线不稳定则 A6-2 的结论一并作废」是同一条纪律。
+            checks.append({
+                "id": "A7", "title": "页面集合与线框图一致",
+                "status": "fail",
+                "evidence": {"wireframe": str(wf_path),
+                             "reason": "线框图里解析不到任何 page code —— 格式变了？"
+                                       "此时「集合相等」是恒真命题，必须判失败"},
+            })
+        else:
+            extra = sorted(proto_pages - wf_pages)
+            missing = sorted(wf_pages - proto_pages)
+            checks.append({
+                "id": "A7", "title": "页面集合与线框图一致",
+                "status": "pass" if not (extra or missing) else "fail",
+                "evidence": {"wireframe": str(wf_path),
+                             "wireframePages": sorted(wf_pages),
+                             "prototypePages": sorted(proto_pages),
+                             "extraInPrototype": extra,      # 原型新增了线框之外的页面
+                             "missingInPrototype": missing},  # 线框页未在原型中实现
+            })
+
     failed = [c["id"] for c in checks if c["status"] == "fail"]
     return {"totalChecks": len(checks), "passed": len(checks) - len(failed),
             "pages": total, "failed": failed, "checks": checks}
@@ -256,8 +324,19 @@ const bad2 = <span><div>块级进 span</div></span>;
 GOOD_HTML = '<a href="设计系统.html">设计系统</a><link href="favicon.svg">'
 BAD_HTML = '<a href="missing-page.html">死链</a>'
 
+# A7 样本：线框图的页面编号写法与真实产物一致（`<span class="code">XX-NN</span>`）
+GOOD_WF = ["U-02", "M-02", "R-02", "O-11", "C-02"]   # 与 GOOD_JSX 的 5 页完全一致
+BAD_WF = ["U-02", "M-02", "C-02", "O-11"]            # 与 BAD_JSX 双向不一致，见下
 
-def _make(base: Path, jsx: str, html: str) -> Path:
+
+def _wf(codes) -> str:
+    """按真实线框图的写法拼一份最小线框图。"""
+    body = "\n".join(
+        '<p class="cap"><span class="code">%s</span>页面</p>' % c for c in codes)
+    return "<!DOCTYPE html><html><body>%s</body></html>" % body
+
+
+def _make(base: Path, jsx: str, html: str, wf_codes) -> Path:
     (base / "src").mkdir(parents=True, exist_ok=True)
     (base / "src" / "app.jsx").write_text(jsx, encoding="utf-8")
     off = base / "离线版"
@@ -267,6 +346,8 @@ def _make(base: Path, jsx: str, html: str) -> Path:
     (off / "交付导航.html").write_text(html, encoding="utf-8")
     (off / "favicon.svg").write_text("<svg/>", encoding="utf-8")
     (off / "设计系统.html").write_text("<html></html>", encoding="utf-8")
+    # 线框图放在**原型目录**里，测 find_wireframe 的定位能力（真实项目里它在项目根，往上两级）
+    (base / "低保真线框图-selftest.html").write_text(_wf(wf_codes), encoding="utf-8")
     return base
 
 
@@ -277,18 +358,25 @@ def selftest() -> int:
     import tempfile
 
     with tempfile.TemporaryDirectory() as d:
-        good = analyze(_make(Path(d) / "g", GOOD_JSX, GOOD_HTML), UPSTREAM)
+        good = analyze(_make(Path(d) / "g", GOOD_JSX, GOOD_HTML, GOOD_WF), UPSTREAM)
     with tempfile.TemporaryDirectory() as d:
-        bad = analyze(_make(Path(d) / "b", BAD_JSX, BAD_HTML), UPSTREAM)
+        bad = analyze(_make(Path(d) / "b", BAD_JSX, BAD_HTML, BAD_WF), UPSTREAM)
+    with tempfile.TemporaryDirectory() as d:
+        # ★ 控制项：线框图里**没有**可解析编号时必须失败，
+        #   否则「两侧都空」会让 A7 退化成恒真命题（等于没有检查）。
+        ctrl = analyze(_make(Path(d) / "c", GOOD_JSX, GOOD_HTML, []), UPSTREAM)
 
     ok_good = good.get("failed") == []
-    ok_bad = bad.get("failed") == ["A1", "A2", "A3", "A4", "A5"]
+    ok_bad = bad.get("failed") == ["A1", "A2", "A3", "A4", "A5", "A7"]
+    ok_ctrl = ctrl.get("failed") == ["A7"]
     print("变异测试 —— 证明检查有判别力")
-    print(f"  好样本 期望全绿            : {'通过' if ok_good else '失败'}"
+    print(f"  好样本 期望全绿             : {'通过' if ok_good else '失败'}"
           f"  (实得 failed={good.get('failed')})")
-    print(f"  坏样本 期望 A1-A5 全红  : {'通过' if ok_bad else '失败'}"
+    print(f"  坏样本 期望 A1-A5+A7 全红   : {'通过' if ok_bad else '失败'}"
           f"  (实得 failed={bad.get('failed')})")
-    if not (ok_good and ok_bad):
+    print(f"  控制项 空线框只应 A7 红     : {'通过' if ok_ctrl else '失败'}"
+          f"  (实得 failed={ctrl.get('failed')})")
+    if not (ok_good and ok_bad and ok_ctrl):
         print("\n判别力不足 —— 该检查等于没有检查。")
         return 1
     print("\n判别力成立。")
@@ -300,6 +388,9 @@ def main() -> int:
     ap.add_argument("root", nargs="?")
     ap.add_argument("--pages", dest="pages",
                     help="交互文档 Markdown（A5 校验落点编号是否在上游存在）")
+    ap.add_argument("--wireframe", dest="wireframe",
+                    help="低保真线框图 HTML（A7 校验页面集合是否与线框一致）；"
+                         "不传则向原型目录的上级自动查找")
     ap.add_argument("--json", dest="json_out")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
@@ -319,7 +410,7 @@ def main() -> int:
             return 2
         txt = MASK_CARD_RE.sub("###", up.read_text(encoding="utf-8"))
         upstream = set(PROTO_PAGE_RE.findall(txt))
-    result = analyze(root, upstream)
+    result = analyze(root, upstream, args.wireframe)
     if result.get("error"):
         print(result["error"], file=sys.stderr)
         return 2
@@ -363,6 +454,20 @@ def main() -> int:
                     print(f"         （以上 {len(ev['notInPrototype'])} 条为覆盖范围告知："
                           f"`const HARD` 是项目级约束表，落点可含本原型未实现的简设页；"
                           f"只要每条约束还有**至少一个**原型内落点即可）")
+        elif c["id"] == "A7":
+            if ev.get("reason"):
+                print(f"         {ev['reason']}")
+            else:
+                print(f"         线框 {ev['wireframe']}")
+                print(f"         线框 {len(ev['wireframePages'])} 页 · "
+                      f"原型 {len(ev['prototypePages'])} 页")
+                for p in ev["extraInPrototype"]:
+                    print(f"         🔴 {p} 只在本原型、线框里没有"
+                          f"（= 新增了线框之外的页面，B1 明确不许）")
+                for p in ev["missingInPrototype"]:
+                    print(f"         🔴 {p} 线框里有、本原型未实现")
+                if not (ev["extraInPrototype"] or ev["missingInPrototype"]):
+                    print("         ✅ 两侧页面集合逐一对应")
 
     if args.json_out:
         out = Path(args.json_out)

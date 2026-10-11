@@ -127,7 +127,7 @@
 | `check-duplicate-norms.py` | 02 · **A7** 口径副本检测 | OK | **1/1**（定义正文指纹命中 1 处、副本 0） |
 | `check-design-tokens.py` | 03 · A1–A5 | OK | 2/5 → **5/5** |
 | `check-library.py` | 03b · A1–A8 | OK | **8/8** |
-| `check-prototype.py` | 04 · A1–A5 | OK | 4/5 → **5/5** |
+| `check-prototype.py` | 04 · A1–A5 + **A7** 页面集合 vs 线框集合 | OK | 4/5 → 5/5 → **6/6** |
 | `check-offline.py` | 04 · **A6** 离线包 `file://` 实测 | OK | **通过**（3 个单文件 / 0 报错 / 23 个锚点全生效 / 3 页可达） |
 | `check-cards.py` | 06 · A1–A6 | OK | 5/6 → **6/6** |
 | `scripts/check-publish-safe.py` | 发布守卫 · BLOCK / WARN 三级 | OK | **0 BLOCK**（非阶段判据） |
