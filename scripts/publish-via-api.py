@@ -256,6 +256,40 @@ def compare(cli: Client) -> bool:
 
 # ──────────────────────────── 发布 ────────────────────────────
 
+def diff_entries(old_ref: str, new_ref: str) -> tuple[list[str], list[str]]:
+    """把两个提交的差异拆成「新增/修改」与「删除」两组路径。
+
+    用 `--name-status -z` 而不是 `--name-only` —— 后者不区分增删改，
+    删掉的文件会被当成要上传的，随后 `cat-file blob` 必然失败。
+    `-z` 下每条记录是 `状态\0路径\0`；重命名/复制是 `R100\0旧路径\0新路径\0`。
+    """
+    fields = [f for f in git("diff", "--name-status", "-z", old_ref, new_ref).split("\0") if f]
+    adds: list[str] = []
+    dels: list[str] = []
+    i = 0
+    while i < len(fields):
+        st = fields[i]
+        i += 1
+        if st[:1] in ("R", "C"):          # 重命名 / 复制：旧路径删、新路径加
+            if i + 1 >= len(fields):
+                raise Fail("diff 输出不完整，无法解析重命名：" + st)
+            dels.append(fields[i])
+            adds.append(fields[i + 1])
+            i += 2
+            continue
+        if i >= len(fields):
+            raise Fail("diff 输出不完整，缺少路径：" + st)
+        path = fields[i]
+        i += 1
+        if st[:1] == "D":
+            dels.append(path)
+        elif st[:1] == "U":
+            raise Fail("存在未合并的路径：%s —— 先解决冲突再发布" % path)
+        else:                              # A / M / T / X
+            adds.append(path)
+    return adds, dels
+
+
 def ident_to_iso(line: str) -> tuple[str, str, str]:
     m = re.match(r"^(.*) <(.*)> (\d+) ([+-])(\d{2})(\d{2})$", line)
     if not m:
@@ -290,12 +324,18 @@ def publish(cli: Client, dry_run: bool, make_tag: bool) -> int:
     if remote_tree != gittext("rev-parse", local_parent + "^{tree}"):
         raise Fail("远端 tree 与本地父提交 tree 不一致 —— 两边已经有分歧，先查清再发。")
 
-    changed = [p for p in git("diff", "--name-only", "-z", local_parent, local_head).split("\0") if p]
-    print("\n变化 %d 个文件：" % len(changed))
+    # ⚠️ 必须区分「新增/修改」与「删除」：只取 --name-only 会把删掉的文件也当成要上传的，
+    # 然后 `git cat-file blob HEAD:<已删除的路径>` 直接失败。
+    # 删掉的条目在 tree 里用 {"path": p, "sha": None} 表示（GitHub 的删除写法）。
+    adds, dels = diff_entries(local_parent, local_head)
+    print("\n变化：新增/修改 %d 个 · 删除 %d 个" % (len(adds), len(dels)))
 
     # 规则 1：字节取自 git 对象库，不读工作区。
     entries = []
-    for p in sorted(changed):
+    for p in sorted(dels):
+        entries.append({"path": p, "sha": None})
+        print("  删除           %s" % p)
+    for p in sorted(adds):
         raw = git("cat-file", "blob", "HEAD:" + p, binary=True)
         b64 = base64.b64encode(raw).decode("ascii")
         sha = cli.call("POST", "/repos/%s/git/blobs" % cli.slug, {"content": b64, "encoding": "base64"})["sha"]
