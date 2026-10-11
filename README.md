@@ -185,8 +185,8 @@ pm-workflow/
 │   ├── setup-and-migration.md
 │   └── gotchas.md            # 踩坑总表
 ├── feedback/                 # 反馈层 —— 只放「判据本体」，不放产出
-│   ├── rubric/               # 6 份质量标尺（每阶段 ≤10 条）
-│   ├── checks/               # 8 个检查器（每个都带 --selftest）
+│   ├── rubric/               # 每阶段一份质量标尺（每阶段 ≤10 条）
+│   ├── checks/               # A 类检查器，每个都带 --selftest
 │   ├── anti-patterns.md      # 反例库：AP-01 …
 │   ├── ANCHORING.md          # 不一致锚定规则 + B→A 升级路线
 │   └── README.md             # 机制说明 + 本体/产出的分界线
@@ -199,7 +199,7 @@ pm-workflow/
     ├── build-manual.py               # 从 references/ 现渲染手册
     ├── check-manual.py               # 手册与 references/ 的漂移检查
     ├── check-publish-safe.py         # 发布前自检：密钥 / PII / 本机路径 / 项目词
-    ├── check-templates-clean.py      # 模板洁净度：不许带项目词 / 写死标题 / 已下线阶段
+    ├── check-templates-clean.py      # 模板洁净度 + 判据洁净度（项目词/写死标题/已下线阶段/泳道端枚举/判据硬编码）
     ├── publish-via-api.py            # git push 不通时按 Git Data API 发布 + 逐路径验收
     ├── md-tables-for-library.py      # 素材库表格渲染
     └── publish-denylist.example.txt  # 项目词黑名单模板（真名单不进库）

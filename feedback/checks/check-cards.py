@@ -207,18 +207,54 @@ def parse_cards(text: str) -> list[dict]:
 
 def parse_feature_refs(path: Path) -> dict[str, dict]:
     """从功能列表取出 编号 -> {priority, fr_cell}。"""
+    return parse_feat_string(path.read_text(encoding="utf-8"))
+
+
+def parse_feat_string(text: str) -> dict[str, dict]:
+    """从表格文本取出 编号 -> {priority, fr_cell}。
+
+    🔴 列位置**按表头名定位，不按列号**。
+    初版写死 `cells[3]`=优先级、`cells[4]`=对应 FR —— 那是某一个项目的表格布局。
+    换一个项目的表（列数 / 列序 / 列名都不同）就会**静默取错列**：
+    取到「来源」或「状态」这种文本，于是优先级分布全错、A7 的 FR 比对全错，
+    而报告里看不出「我取错列了」。
+
+    表头认这些名字；找不到表头才退回列号（并在返回值里带`_noHeader`）。
+    """
     out: dict[str, dict] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+    hdr: dict[str, int] = {}
+    for line in text.splitlines():
         s = line.strip()
         if not s.startswith("|"):
+            hdr = {}          # 非表格行 = 表头作用域结束
             continue
         cells = [c.strip() for c in s.strip("|").split("|")]
-        if len(cells) < 6:
+        low = [strip_marks(c).lower() for c in cells]
+        if any("编号" in c or c == "id" for c in low) and \
+                any("优先级" in c or "priority" in c for c in low):
+            hdr = {}
+            for j, c in enumerate(low):
+                if "编号" in c or c == "id":
+                    hdr["id"] = j
+                elif "优先级" in c or c == "priority":
+                    hdr["priority"] = j
+                elif ("对应" in c and ("fr" in c or "br" in c)) or c in ("fr", "br"):
+                    hdr["ref"] = j
             continue
-        cid = strip_marks(cells[0])
+        if len(cells) < 5:
+            continue
+        id_idx = hdr.get("id", 0)
+        if id_idx >= len(cells):
+            continue
+        cid = strip_marks(cells[id_idx])
         if not FR_HEAD_RE.match(cid):
             continue
-        out[cid] = {"priority": strip_marks(cells[3]), "fr_cell": strip_marks(cells[4])}
+
+        def cell(key: str, default_idx: int) -> str:
+            j = hdr.get(key, default_idx)
+            return strip_marks(cells[j]) if j < len(cells) else ""
+
+        out[cid] = {"priority": cell("priority", 3), "fr_cell": cell("ref", 4)}
     return out
 
 
@@ -583,22 +619,6 @@ def selftest() -> int:
         return 1
     print("\n判别力成立：同一套探针在两种世界状态下产出不同结果。")
     return 0
-
-
-def parse_feat_string(text: str) -> dict[str, dict]:
-    out = {}
-    for line in text.splitlines():
-        s = line.strip()
-        if not s.startswith("|"):
-            continue
-        cells = [c.strip() for c in s.strip("|").split("|")]
-        if len(cells) < 6:
-            continue
-        cid = strip_marks(cells[0])
-        if not FR_HEAD_RE.match(cid):
-            continue
-        out[cid] = {"priority": strip_marks(cells[3]), "fr_cell": strip_marks(cells[4])}
-    return out
 
 
 # ------------------------------------------------------------ CLI

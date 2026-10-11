@@ -19,6 +19,25 @@
 
 一条 WARN：**T5** 模板目录与 SKILL.md 阶段表对不上（说明文档或目录有一边过期）。
 
+🔴 一条 BLOCK：**T6** `feedback/checks/*.py` 里有**按项目硬编码的判据常量**。
+
+| 编号 | 判什么 | 为什么不许 |
+|---|---|---|
+| **T6** | 检查器里出现「模块名/ 端名白名单」或「按列号取字段」 | 判据只该问「这份文档内部自不自洽」。认识某一个项目的模块名 =换项目就误报或空转 |
+
+T6 的判据形态（都必须是**代码常量赋值**，不是散文提及）：
+
+```python
+PREFIX_NAME = {...}       # ❌ 端名/模块名白名单
+END_KEYWORDS = [...]      # ❌ 关键词猜端
+cells[3] / cells[4]       # ❌ 按列号取字段（表格布局是项目的事）
+```
+
+**为什么不能只扫项目词**：rubric 里**引用**这个缺陷当案例是合法的、必要的
+（「这里曾硬编码过端名白名单」是判据的历史，必须留）。
+所以判据只抓「代码里赋值给常量」这一种形态—— **散文提及不是声明，赋值才是**。
+这与 A6「只认行首编号」是同一个道理。
+
 > ⚠️ **没有配置 `scripts/publish-denylist.txt` 时，T1 报「未扫描」而不是「通过」** ——
 > 静默通过 = 什么都没查。这与 `check-publish-safe.py` 是同一条纪律。
 
@@ -63,6 +82,27 @@ EXTRA_ALLOWED_CN = {"外部系统"}      # 端枚举之外的合法泳道
 NO_TEMPLATE_STAGES = {
     "03b": "03b 是 skill 级、跨项目累积的库，不随项目建目录（SKILL.md 第 2 步已写明）",
 }
+
+# ---------- T6：判据不许认识某一个项目 ----------
+#
+# 三种形态，都是**常量赋值**（散文提及合法 —— 那是判据的历史，必须留）：
+#   1. 白名单字典：PREFIX_NAME = {"U": "用户端小程序", ...}
+#   2. 关键词表：  END_KEYWORDS = [("用户端", "U"), ...]
+#   3. 按列号取字段：cells[3] / cells[4]
+# 只抓「看起来在给某个东西建表」的名字 —— 全字匹配会误伤判据自己的常量
+# （ENDPOINTS_RE / TOTAL_ROW_RE 这类）。
+HARDCODE_LIST_RE = re.compile(
+    r"^\s*(?:[A-Z][A-Z0-9_]*_)?"
+    r"(?:PREFIX[_\s]?NAME|END[_\s]?KEYWORDS|LANE[_\s]?NAMES|MODULE[_\s]?NAMES"
+    r"|ENDPOINT[_\s]?WHITELIST|TABLE[_\s]?NAMES)"
+    r"\s*[:=]", re.M)
+# 🔴 按列号取字段 —— **只抓下标 ≥ 2 的非首列**。
+#    首列（cells[0]）是「这一行的标识」，任何表格解析都要取它，不是「按布局定位」。
+#    真正的坑是「优先级在第 3 列、对应 FR 在第 4 列」这种**依赖具体布局**的取法。
+#    另外跳过注释行（散文提及这个缺陷是合法的、必要的 —— 那是判据的历史）。
+COL_INDEX_RE = re.compile(r"\b(?:cells|row|columns|fields)\s*\[\s*([2-9]|\d{2,})\s*\]")
+COMMENT_LINE_RE = re.compile(r"^\s*(?:#|\"\"\"|'''|>)")
+CHECKS_REL = Path("feedback") / "checks"
 
 
 # ---------- 扫描 ----------
@@ -129,6 +169,41 @@ def scan_text(rel: str, text: str, terms: list[str]) -> list[dict]:
 _ALLOWED_CN: set[str] = EXTRA_ALLOWED_CN   # 运行时会并上端枚举
 
 
+def _in_docstring(text: str, idx: int) -> bool:
+    """第idx 行是否处在三引号文档字符串内部。
+
+    🔴 需要按**配对计数**判断，不能只看行首有没有 `\"\"\"`：
+    docstring 内部的普通文字行不以引号开头（例：「初版写死 `cells[3]`=优先级」）。
+    这些行是**判据的历史/说明**，是合法且必要的，误报它们= 逼人删掉判据史。
+    """
+    q = 0
+    for line in text.split("\n")[:idx]:
+        q += line.count('"""') + line.count("'''")
+    return q % 2 == 1
+
+
+def scan_code_constants(rel: str, text: str) -> list[dict]:
+    """T6 —— 扫「判据里按项目硬编码的常量」。只对 .py 生效，且只认常量赋值形态。"""
+    hits: list[dict] = []
+    doc = False
+    for i, line in enumerate(text.split("\n"), 1):
+        # 三引号配对计数：奇数=在文档字符串内
+        doc = not doc
+        if doc:
+            continue
+        if PARSE_CTX_RE.search(line):
+            continue
+        if HARDCODE_LIST_RE.search(line):
+            hits.append({"level": "BLOCK",
+                         "kind": "T6 判据里出现端名/模块名白名单常量",
+                         "path": rel, "line": i, "sample": line.strip()[:90]})
+        elif COL_INDEX_RE.search(line) and not COMMENT_LINE_RE.match(line):
+            hits.append({"level": "BLOCK",
+                         "kind": "T6 判据按列号取字段（表格布局是项目的事，应按表头名定位）",
+                         "path": rel, "line": i, "sample": line.strip()[:90]})
+    return hits
+
+
 def analyze(skill: Path) -> dict:
     global _ALLOWED_CN
     terms, has_deny = load_denylist(skill)
@@ -171,6 +246,14 @@ def analyze(skill: Path) -> dict:
                              "sample": "要么补模板，要么把它加进 check-templates-clean.py 的 "
                                        "NO_TEMPLATE_STAGES 并写清理由"})
 
+    # T6 —— 判据里按项目硬编码的常量（检查器目录）
+    if CHECKS_REL.exists():
+        for p in sorted((skill / CHECKS_REL).rglob("*.py")):
+            if any(d in p.parts for d in SKIP_DIRS):
+                continue
+            hits += scan_code_constants(str(p.relative_to(skill)),
+                                        p.read_text(encoding="utf-8", errors="replace"))
+
     blocks = [h for h in hits if h["level"] == "BLOCK"]
     warns = [h for h in hits if h["level"] == "WARN"]
     return {"denylist": ("%d 个词" % len(terms)) if has_deny else "未配置（缺 %s）→ ⚠️ 项目词这一类**未扫描**" % DENY_REL,
@@ -208,6 +291,20 @@ GOOD = {
         # 解析用正则里的 <title> 不是要渲染的标题 —— 固定住这条假阳性
         "m = re.search(r'<title>R:(.*?)</title>', r.stdout or '', re.S)\n"
     ),
+    # T6 的好样本：判据从文档现算端名、按表头名定位列 —— 两种形态都不得误报。
+    # 特别地：docstring 里**提到** cells[3] 是判据的历史，必须放行（判据史不许被逼删）。
+    "feedback/checks/check-demo.py": (
+        "ENDPOINTS_RE = re.compile(r'^##\\s*端枚举')\n"
+        "def collect_end_map(lines):\n"
+        '    """端名映射。\n'
+        "\n"
+        "    初版写死 cells[3] 取优先级 —— 那是错的做法，已改。\n"
+        '    """\n'
+        "    return {m.group('pfx'): m.group('name') for m in HEADING_END_RE.finditer(t)}\n"
+        "def cell(cells, hdr, key):\n"
+        "    j = hdr.get(key)\n"
+        "    return cells[j] if j is not None else ''\n"
+    ),
 }
 
 # 每种缺陷各植一条 —— 断言必须**逐条**命中，否则某个判据可能从未被验证过
@@ -218,6 +315,11 @@ BAD = {
     "assets/templates/02-prd/leak.py": "NOTE = '某内部代号 的分成口径'\n",                    # T1
     "assets/templates/02-prd/lane.py": "LANE = {'甲方人事系统': ('laneHr', '#39c5bb')}\n",    # T4
     "assets/templates/05-annotation/build-anno.py": "# 已下线阶段的模板\n",                    # T3
+    # T6 两种形态各植一行：白名单字典 + 按列号取字段
+    "feedback/checks/check-bad.py": (
+        "PREFIX_NAME = {\"U\": \"用户端小程序\", \"C\": \"客服工作台\"}\n"
+        "pri = strip_marks(cells[3])\n"
+    ),
 }
 
 
@@ -230,7 +332,7 @@ def selftest() -> int:
     ok_good = not good["failed"]
     # 逐判据断言：T1–T4 每一条都必须被命中
     kinds = {h["kind"].split()[0] for h in bad["blocks"]}
-    expect = {"T1", "T2", "T3", "T4"}
+    expect = {"T1", "T2", "T3", "T4", "T6"}
     missed = sorted(expect - kinds)
     ok_bad = not missed
 

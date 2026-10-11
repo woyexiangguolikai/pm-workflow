@@ -2,7 +2,7 @@
 name: pm-workflow
 description: 产品经理全流程工作流：盘点 → 需求 → PRD → 设计规范 → 组件库 → 原型 → 需求卡片画布。每阶段产出「JSON 数据源 + HTML 自包含视图」双格式，单一数据源驱动、脚本自校验 + 变异测试，每阶段末尾闭合质量反馈环路（rubric 自评 + 反例库 + 评审流水）。当用户要写 PRD、做需求规格、定设计规范、建组件库、画高保真原型、做需求卡片、把需求与原型关联、盘点存量系统、或提到「产品经理工作流」「PM 工作流」「需求卡片」「原型画布」时使用。
 metadata:
-  ai.workbuddy.version: 1.2.0
+  ai.workbuddy.version: 1.3.0
   ai.workbuddy.author: llllll
   ai.workbuddy.homepage: ""
 ---
@@ -37,8 +37,8 @@ metadata:
 
 | 阶段 | 性质 | 过闸条件 |
 |---|---|---|
-| 00 盘点 | **条件必做**：第 0 问判为「存量改造 / 扩展」→ 必做；全新项目可免 | `audit.json` 存在，功能地图带新旧标注 |
-| 01 需求（含澄清） | **必做** | 澄清 12 域无「没问到」、`clarify-log` 无未确认假设、每条需求 `source` 可追溯 |
+| 00 盘点 | **条件必做**：第 0 问判为「存量改造 / 扩展」→ 必做；全新项目可免 | `audit.json` 存在，功能地图带新旧标注，`python feedback/checks/check-audit.py <项目>/00-audit/audit.json` 无 FAIL |
+| 01 需求（含澄清） | **必做** | 澄清 12 域无「没问到」、`clarify-log` 无未确认假设、每条需求 `source` 可追溯、`python feedback/checks/check-requirements.py <需求清单.md>` 无 FAIL |
 | 02 PRD | **必做** | 每条需求六分区卡片齐全，check 全绿 |
 | 03 设计规范 | **必做**（复用旧规范也要出 `tokens.json` + 一句复用声明） | `tokens.json` + design-spec 过 check |
 | 03b 组件/素材库 | **条件必做**：有 >1 端或多页面复用 → 必做；单页一次性界面可免 | 注入的每条素材 front matter 齐全、可检索，且**许可在白名单内**（A4 是唯一「拦截」而非「上报」的判据 —— 漏记许可 = 与「不允许使用」等价） |
